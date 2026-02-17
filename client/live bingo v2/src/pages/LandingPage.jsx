@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
 import PatternPicker from "../components/PatternPicker";
@@ -55,6 +55,9 @@ const LandingPage = () => {
   }, [socket, navigate, setPlayer, setRoom, formData.username]);
 
   // --- HANDLERS ---
+  const handlePatternChange = useCallback((pattern) => {
+    setFormData((prev) => ({ ...prev, winningPattern: pattern }));
+  }, []);
 
   const handleCreate = (e) => {
     e.preventDefault();
@@ -138,11 +141,7 @@ const LandingPage = () => {
               <label className="block text-sm font-medium text-gray-300 mb-2 text-center">
                 Winning Pattern
               </label>
-              <PatternPicker
-                onPatternChange={(p) =>
-                  setFormData({ ...formData, winningPattern: p })
-                }
-              />
+              <PatternPicker onPatternChange={handlePatternChange} />
             </div>
 
             <button

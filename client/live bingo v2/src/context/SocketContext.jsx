@@ -16,6 +16,7 @@ export const useSocket = () => {
 
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [player, setPlayer] = useState(null);
   const [room, setRoom] = useState(null);
   const navigate = useNavigate();
@@ -24,6 +25,15 @@ export const SocketProvider = ({ children }) => {
     // Initialize socket only once
     const newSocket = io("http://localhost:5000");
     setSocket(newSocket);
+
+    // Listen for connection events
+    newSocket.on("connect", () => {
+      setIsConnected(true);
+    });
+
+    newSocket.on("disconnect", () => {
+      setIsConnected(false);
+    });
 
     // Global listeners
     newSocket.on("room_joined", ({ roomId, player }) => {
@@ -41,19 +51,23 @@ export const SocketProvider = ({ children }) => {
       setSocket(null);
       setPlayer(null);
       setRoom(null);
+      setIsConnected(false);
       navigate("/");
-      window.location.reload(); // Force hard reload to clear state
+      window.location.reload();
     }
   };
 
   const value = useMemo(
     () => ({
       socket,
+      isConnected,
       player,
+      setPlayer,
       room,
+      setRoom,
       disconnectSocket,
     }),
-    [socket, player, room],
+    [socket, isConnected, player, room],
   );
 
   return (
