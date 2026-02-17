@@ -12,6 +12,7 @@ const PlayerSchema = new mongoose.Schema({
 
 const RoomSchema = new mongoose.Schema({
     roomId: { type: String, required: true, unique: true },
+    hostSocketId: { type: String },
 
     // Game Status
     status: {

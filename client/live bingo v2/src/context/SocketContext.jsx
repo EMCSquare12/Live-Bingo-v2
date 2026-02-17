@@ -1,107 +1,60 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import io from "socket.io-client";
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+  useEffect,
+} from "react";
+import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
 
-const SocketContext = createContext();
+const SocketContext = createContext(null);
 
-// Initialize socket outside component to prevent multiple connections
-const socket = io("http://localhost:5000", {
-  autoConnect: false,
-  reconnection: true,
-});
-
-export const useSocket = () => useContext(SocketContext);
+export const useSocket = () => {
+  return useContext(SocketContext);
+};
 
 export const SocketProvider = ({ children }) => {
-  const [isConnected, setIsConnected] = useState(socket.connected);
+  const [socket, setSocket] = useState(null);
   const [player, setPlayer] = useState(null);
   const [room, setRoom] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Connection Event Listeners
-    const onConnect = () => {
-      setIsConnected(true);
-      console.log("Socket Connected:", socket.id);
-    };
+    // Initialize socket only once
+    const newSocket = io("http://localhost:5000");
+    setSocket(newSocket);
 
-    const onDisconnect = () => {
-      setIsConnected(false);
-      console.log("Socket Disconnected");
-    };
+    // Global listeners
+    newSocket.on("room_joined", ({ roomId, player }) => {
+      setRoom(roomId);
+      setPlayer(player);
+    });
 
-    const onRoomDestroyed = (reason) => {
-      toast.error(reason || "Room closed by host.");
+    // Cleanup on unmount
+    return () => newSocket.close();
+  }, []);
+
+  const disconnectSocket = () => {
+    if (socket) {
+      socket.disconnect();
+      setSocket(null);
       setPlayer(null);
       setRoom(null);
       navigate("/");
-    };
-
-    // Attach listeners
-    socket.on("connect", onConnect);
-    socket.on("disconnect", onDisconnect);
-    socket.on("room_destroyed", onRoomDestroyed);
-
-    // RECONNECT LOGIC (The "Reload" Fix)
-    const savedSession = sessionStorage.getItem("bingo_session");
-    if (savedSession && !socket.connected) {
-      const { roomId, playerName } = JSON.parse(savedSession);
-      socket.auth = { roomId, playerName }; // Send auth data if using middleware
-      socket.connect();
-
-      // Emit a specific reconnect event to server (needs server handler)
-      socket.emit("rejoin_room", { roomId, playerName });
+      window.location.reload(); // Force hard reload to clear state
     }
-
-    // Cleanup listeners on unmount
-    return () => {
-      socket.off("connect", onConnect);
-      socket.off("disconnect", onDisconnect);
-      socket.off("room_destroyed", onRoomDestroyed);
-    };
-  }, [navigate]);
-
-  // --- Helper Functions ---
-
-  const connectSocket = (playerName, roomId) => {
-    socket.auth = { playerName };
-    socket.connect();
-
-    // Save session for reload
-    sessionStorage.setItem(
-      "bingo_session",
-      JSON.stringify({
-        playerName,
-        roomId,
-      }),
-    );
   };
 
-  const disconnectSocket = () => {
-    socket.disconnect();
-    sessionStorage.removeItem("bingo_session");
-    setPlayer(null);
-    setRoom(null);
-    navigate("/");
-  };
-
-  // Wrapper to clean up emitted events
-  const emit = (eventName, data) => {
-    socket.emit(eventName, data);
-  };
-
-  const value = {
-    socket,
-    isConnected,
-    player,
-    setPlayer,
-    room,
-    setRoom,
-    connectSocket,
-    disconnectSocket,
-    emit,
-  };
+  const value = useMemo(
+    () => ({
+      socket,
+      player,
+      room,
+      disconnectSocket,
+    }),
+    [socket, player, room],
+  );
 
   return (
     <SocketContext.Provider value={value}>{children}</SocketContext.Provider>

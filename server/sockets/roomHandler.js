@@ -1,11 +1,7 @@
 const Room = require('../models/Room');
 const { v4: uuidv4 } = require('uuid');
+const { generateBingoCard, calculateRemaining, checkWin } = require('../utils/bingoGame');
 
-// Helper to generate a random 5x5 Bingo Card
-const generateBingoCard = () => {
-    const card = [];
-    return card;
-};
 
 module.exports = (io, socket) => {
 
@@ -27,6 +23,7 @@ module.exports = (io, socket) => {
             const newRoom = new Room({
                 roomId,
                 winningPattern,
+                hostSocketId: socket.id,
                 players: [hostPlayer]
             });
 

@@ -14,7 +14,7 @@ const PlayerRoom = () => {
   const [cardMatrix, setCardMatrix] = useState(player?.cardMatrix || []);
   const [markedIndices, setMarkedIndices] = useState(
     player?.markedIndices || [12],
-  ); // 12 is free space
+  );
   const [lastCalledNumber, setLastCalledNumber] = useState(null);
   const [calledHistory, setCalledHistory] = useState([]);
 
@@ -22,55 +22,56 @@ const PlayerRoom = () => {
   useEffect(() => {
     if (!socket) return;
 
-    // Game Started
-    socket.on("game_started", () => {
+    const onGameStarted = () => {
       setGameState("playing");
       toast("Game Started! Good Luck!", { icon: "🍀" });
-    });
+    };
 
-    // Number Rolled
-    socket.on("number_rolled", ({ number, history }) => {
+    const onNumberRolled = ({ number, history }) => {
       setLastCalledNumber(number);
       setCalledHistory(history);
-      // Sound effect could go here
-    });
+    };
 
-    // Mark Success (Server confirmed)
-    socket.on("mark_success", ({ cellIndex }) => {
-      setMarkedIndices((prev) => [...new Set([...prev, cellIndex])]); // Prevent duplicates
-    });
+    const onMarkSuccess = ({ cellIndex }) => {
+      setMarkedIndices((prev) => [...new Set([...prev, cellIndex])]);
+    };
 
-    // Game Over
-    socket.on("game_over", ({ winner }) => {
+    const onGameOver = ({ winner }) => {
       setGameState("ended");
-      if (winner === player.name) {
+      if (winner === player?.name) {
         toast.success("YOU WON! BINGO!!! 🏆");
       } else {
         toast.error(`${winner} won the game.`);
       }
-    });
+    };
 
-    // Card Shuffle (If user requested new card)
-    socket.on("card_shuffled", (newMatrix) => {
+    const onCardShuffled = (newMatrix) => {
       setCardMatrix(newMatrix);
       toast.success("Card Shuffled!");
-    });
-
-    // Action Error (Cheating or Mistake)
-    socket.on("action_error", (msg) => toast.error(msg));
-
-    return () => {
-      socket.off("game_started");
-      socket.off("number_rolled");
-      socket.off("mark_success");
-      socket.off("game_over");
-      socket.off("card_shuffled");
-      socket.off("action_error");
     };
-  }, [socket, player.name]);
+
+    const onActionError = (msg) => toast.error(msg);
+
+    // Attach listeners
+    socket.on("game_started", onGameStarted);
+    socket.on("number_rolled", onNumberRolled);
+    socket.on("mark_success", onMarkSuccess);
+    socket.on("game_over", onGameOver);
+    socket.on("card_shuffled", onCardShuffled);
+    socket.on("action_error", onActionError);
+
+    // Cleanup
+    return () => {
+      socket.off("game_started", onGameStarted);
+      socket.off("number_rolled", onNumberRolled);
+      socket.off("mark_success", onMarkSuccess);
+      socket.off("game_over", onGameOver);
+      socket.off("card_shuffled", onCardShuffled);
+      socket.off("action_error", onActionError);
+    };
+  }, [socket, player]);
 
   // --- HANDLERS ---
-
   const handleLeave = () => {
     if (confirm("Are you sure you want to leave?")) {
       disconnectSocket();
@@ -78,22 +79,16 @@ const PlayerRoom = () => {
   };
 
   const handleCellClick = (index, number) => {
-    // Basic Validation
     if (gameState !== "playing") {
       if (gameState === "waiting") return toast("Game hasn't started yet.");
       return;
     }
-
-    // Already marked?
     if (markedIndices.includes(index)) return;
 
-    // Is the number actually called? (Local check for speed)
     if (!calledHistory.includes(number)) {
       toast.error(`${number} hasn't been called!`);
       return;
     }
-
-    // Emit to Server
     socket.emit("mark_number", { roomId: room, number, cellIndex: index });
   };
 
@@ -102,7 +97,7 @@ const PlayerRoom = () => {
   };
 
   const handleShuffle = () => {
-    toast("Shuffle not implemented on server yet!");
+    socket.emit("request_shuffle", { roomId: room });
   };
 
   return (
@@ -110,7 +105,7 @@ const PlayerRoom = () => {
       {/* TOP BAR */}
       <div className="w-full max-w-md flex justify-between items-center mb-6 bg-gray-800 p-3 rounded-xl border border-gray-700">
         <div>
-          <h2 className="font-bold text-lg">{player?.name}</h2>
+          <h2 className="font-bold text-lg">{player?.name || "Player"}</h2>
           <p className="text-xs text-gray-400 font-mono">ROOM: {room}</p>
         </div>
         <button
@@ -121,18 +116,13 @@ const PlayerRoom = () => {
         </button>
       </div>
 
-      {/* LAST CALLED NUMBER (Hero) */}
+      {/* HERO SECTION */}
       <div className="mb-6 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500">
         <div className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-1">
           {gameState === "waiting" ? "Waiting for Host..." : "Current Number"}
         </div>
         <div
-          className={`
-            w-24 h-24 rounded-full flex items-center justify-center 
-            border-4 border-white shadow-[0_0_20px_rgba(236,72,153,0.5)]
-            text-4xl font-black bg-gradient-to-br from-pink-500 to-purple-600
-            ${lastCalledNumber ? "animate-bounce" : "opacity-50"}
-         `}
+          className={`w-24 h-24 rounded-full flex items-center justify-center border-4 border-white shadow-[0_0_20px_rgba(236,72,153,0.5)] text-4xl font-black bg-gradient-to-br from-pink-500 to-purple-600 ${lastCalledNumber ? "animate-bounce" : "opacity-50"}`}
         >
           {lastCalledNumber || "--"}
         </div>

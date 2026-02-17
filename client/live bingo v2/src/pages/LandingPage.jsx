@@ -18,6 +18,7 @@ const LandingPage = () => {
 
   // --- SOCKET EVENT LISTENERS ---
   useEffect(() => {
+    if (!socket) return;
     // Listen for successful Room Creation
     socket.on("room_created", ({ roomId, player }) => {
       setRoom(roomId);
@@ -57,6 +58,7 @@ const LandingPage = () => {
 
   const handleCreate = (e) => {
     e.preventDefault();
+    if (!socket) return toast.error("Server not connected...");
     if (!formData.username) return toast.error("Name is required");
     if (formData.winningPattern.length === 0)
       return toast.error("Select at least 1 winning cell");
@@ -71,6 +73,7 @@ const LandingPage = () => {
 
   const handleJoin = (e) => {
     e.preventDefault();
+    if (!socket) return toast.error("Server not connected...");
     if (!formData.username || !formData.roomCode)
       return toast.error("Fill all fields");
 
