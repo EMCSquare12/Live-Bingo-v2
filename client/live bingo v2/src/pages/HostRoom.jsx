@@ -14,6 +14,7 @@ const HostRoom = () => {
   const [history, setHistory] = useState([]);
   const [players, setPlayers] = useState([]);
   const [winner, setWinner] = useState(null);
+  console.log(players)
 
   // UI State
   const [isRolling, setIsRolling] = useState(false);

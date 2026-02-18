@@ -65,6 +65,8 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
                         player: existingPlayer.toObject(),
                         playersList: room.players
                     });
+
+                    socket.emit('update_player_list', room.players);
                     
                     if (room.status === 'playing') {
                         socket.emit('game_started', { status: 'playing' });
@@ -93,7 +95,7 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
                 name: playerName,
                 cardMatrix: generateBingoCard(),
                 isHost: false,
-                markedIndices: [12] // *** FIXED: Auto-mark Free Space (Center) for new players
+                markedIndices: [12]
             };
 
             room.players.push(newPlayer);
