@@ -19,34 +19,44 @@ export const SocketProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [player, setPlayer] = useState(null);
   const [room, setRoom] = useState(null);
+
+  // 1. Check for session immediately
+  const [isRestoring, setIsRestoring] = useState(() => {
+    const hasSession = !!sessionStorage.getItem("bingoSession");
+    console.log("SocketProvider Init: Has session to restore?", hasSession);
+    return hasSession;
+  });
+
   const navigate = useNavigate();
 
-  // Initialize Socket
   useEffect(() => {
-    //IP IF TESTING ON MOBILE (e.g. "http://192.168.1.5:5000")
-    const newSocket = io("http://localhost:5000"); 
+    const newSocket = io("http://localhost:5000");
     setSocket(newSocket);
 
     newSocket.on("connect", () => {
+      console.log("Socket connected:", newSocket.id);
       setIsConnected(true);
-      // Attempt Reconnect if session exists
+
       const savedSession = sessionStorage.getItem("bingoSession");
       if (savedSession) {
+        console.log("Found session, attempting to rejoin...");
         const { roomId, player: savedPlayer } = JSON.parse(savedSession);
-        // Ask server to restore this specific player ID
-        newSocket.emit("join_room", { 
-            roomId, 
-            playerName: savedPlayer.name,
-            playerId: savedPlayer._id 
+        newSocket.emit("join_room", {
+          roomId,
+          playerName: savedPlayer.name,
+          playerId: savedPlayer._id
         });
+      } else {
+        console.log("No session found, stopping restore.");
+        setIsRestoring(false);
       }
     });
 
     newSocket.on("disconnect", () => {
+      console.log("Socket disconnected");
       setIsConnected(false);
     });
 
-    // Global listeners for setting state
     newSocket.on("room_created", ({ roomId, player }) => {
       setRoom(roomId);
       setPlayer(player);
@@ -54,30 +64,45 @@ export const SocketProvider = ({ children }) => {
     });
 
     newSocket.on("room_joined", ({ roomId, player }) => {
+      console.log("Room joined successfully. Restore complete.");
       setRoom(roomId);
       setPlayer(player);
       saveSession(roomId, player);
-      
-      // Navigate to correct page based on role
+      setIsRestoring(false); // <--- STOP LOADING
+
+      // Only navigate if we are explicitly not on the right path
+      // (Optional: You can remove this navigate if ProtectedRoute handles it)
       if (player.isHost) {
-        navigate(`/host/${roomId}`);
+        navigate(`/host`);
       } else {
-        navigate(`/room/${roomId}`);
+        navigate(`/play`);
       }
     });
 
+    newSocket.on("error", (err) => {
+        console.error("Socket error:", err);
+        // If an error happens during restore (e.g. room closed), stop loading
+        setIsRestoring(false); 
+    });
+
     newSocket.on("room_destroyed", () => {
-        clearSession();
-        alert("Room closed");
-        navigate("/");
+      clearSession();
+      setIsRestoring(false);
+      alert("Room closed");
+      navigate("/");
     });
 
     return () => newSocket.close();
   }, []);
 
-  // Helper to save to Session Storage
   const saveSession = (roomId, playerData) => {
-    sessionStorage.setItem("bingoSession", JSON.stringify({ roomId, player: playerData }));
+    try {
+        console.log("Saving session:", { roomId, playerData });
+        sessionStorage.setItem("bingoSession", JSON.stringify({ roomId, player: playerData }));
+        console.log("Session saved successfully!");
+    } catch (error) {
+        console.error("FAILED to save session:", error);
+    }
   };
 
   const clearSession = () => {
@@ -86,16 +111,15 @@ export const SocketProvider = ({ children }) => {
     setRoom(null);
   };
 
-  // Explicit Disconnect (Used by Leave/End buttons)
   const disconnectSocket = () => {
     if (socket && room && player) {
-      // Notify server we are leaving explicitly
       socket.emit("leave_room", { roomId: room, playerId: player._id });
       clearSession();
       navigate("/");
     }
   };
 
+  // 2. CRITICAL: Pass isRestoring in value
   const value = useMemo(
     () => ({
       socket,
@@ -105,8 +129,9 @@ export const SocketProvider = ({ children }) => {
       room,
       setRoom,
       disconnectSocket,
+      isRestoring, 
     }),
-    [socket, isConnected, player, room],
+    [socket, isConnected, player, room, isRestoring],
   );
 
   return (

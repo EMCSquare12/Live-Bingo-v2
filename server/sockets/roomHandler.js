@@ -25,9 +25,11 @@ module.exports = (io, socket) => {
 
             await newRoom.save();
             socket.join(roomId);
-
+            
+            // Send back the created player object (which now has an _id from Mongoose)
+            // We fetch the saved room to get the Mongoose _id
             const savedRoom = await Room.findOne({ roomId });
-            const savedHost = savedRoom.players[0];
+            const savedHost = savedRoom.players[0].toObject();
 
             socket.emit('room_created', { roomId, player: savedHost });
             console.log(`Room ${roomId} created by ${hostName}`);
@@ -64,9 +66,9 @@ module.exports = (io, socket) => {
                     socket.join(roomId);
 
                     // Restore client state
-                    socket.emit('room_joined', {
+                   socket.emit('room_joined', {
                         roomId,
-                        player: existingPlayer,
+                        player: existingPlayer.toObject(),
                         playersList: room.players
                     });
                     
@@ -110,7 +112,7 @@ module.exports = (io, socket) => {
 
             socket.emit('room_joined', {
                 roomId,
-                player: savedPlayer,
+                player: savedPlayer.toObject(),
                 playersList: updatedRoom.players
             });
 
