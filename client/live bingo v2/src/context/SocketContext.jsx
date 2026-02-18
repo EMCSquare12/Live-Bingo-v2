@@ -81,6 +81,13 @@ useEffect(() => {
       navigate("/");
     });
 
+    newSocket.on("room_created", ({ roomId, player }) => {
+      setRoom(roomId);
+      setPlayer(player);
+      saveSession(roomId, player);
+      setIsRestoring(false);
+    });
+
     return () => newSocket.close();
   }, [navigate]);
 
