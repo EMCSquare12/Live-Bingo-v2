@@ -5,7 +5,7 @@ const { generateBingoCard, calculateRemaining, checkWin } = require('../utils/bi
 module.exports = (io, socket) => {
 
     // --- CREATE ROOM ---
-    socket.on('create_room', async ({ hostName, winningPattern }) => {
+socket.on('create_room', async ({ hostName, winningPattern }) => {
         try {
             const roomId = uuidv4().substring(0, 6).toUpperCase();
 
@@ -13,7 +13,8 @@ module.exports = (io, socket) => {
                 socketId: socket.id,
                 name: hostName,
                 isHost: true,
-                cardMatrix: []
+                cardMatrix: [], 
+                markedIndices: [] // Host usually doesn't play, so no free space needed
             };
 
             const newRoom = new Room({
@@ -26,8 +27,6 @@ module.exports = (io, socket) => {
             await newRoom.save();
             socket.join(roomId);
             
-            // Send back the created player object (which now has an _id from Mongoose)
-            // We fetch the saved room to get the Mongoose _id
             const savedRoom = await Room.findOne({ roomId });
             const savedHost = savedRoom.players[0].toObject();
 
@@ -49,43 +48,37 @@ module.exports = (io, socket) => {
                 return socket.emit('error', 'Room not found');
             }
 
-            // RECONNECTION ATTEMPT
+            // RECONNECTION
             if (playerId) {
                 const existingPlayer = room.players.find(p => p._id.toString() === playerId);
                 
                 if (existingPlayer) {
-                    // Update the socket ID to the new connection
                     existingPlayer.socketId = socket.id;
-                    
-                    // If it was the host, update the main host reference
                     if (existingPlayer.isHost) {
                         room.hostSocketId = socket.id;
                     }
-
                     await room.save();
                     socket.join(roomId);
 
-                    // Restore client state
                    socket.emit('room_joined', {
                         roomId,
                         player: existingPlayer.toObject(),
                         playersList: room.players
                     });
                     
-                    // If game is playing, ensure they get current game state
                     if (room.status === 'playing') {
                         socket.emit('game_started', { status: 'playing' });
+                        // Send current number and history on reconnect
                         socket.emit('number_rolled', { 
                             number: room.currentNumber, 
                             history: room.numbersDrawn 
                         });
                     }
-                    
                     return;
                 }
             }
 
-            // NEW PLAYER LOGIC
+            // NEW PLAYER
             if (room.status === 'playing') {
                 socket.join(roomId);
                 socket.emit('spectator_joined', {
@@ -99,14 +92,14 @@ module.exports = (io, socket) => {
                 socketId: socket.id,
                 name: playerName,
                 cardMatrix: generateBingoCard(),
-                isHost: false
+                isHost: false,
+                markedIndices: [12] // *** FIXED: Auto-mark Free Space (Center) for new players
             };
 
             room.players.push(newPlayer);
             await room.save();
             socket.join(roomId);
 
-            // Get the saved player to ensure we have the _id
             const updatedRoom = await Room.findOne({ roomId });
             const savedPlayer = updatedRoom.players.find(p => p.socketId === socket.id);
 
@@ -129,14 +122,12 @@ module.exports = (io, socket) => {
         const room = await Room.findOne({ roomId });
         if (!room) return;
 
-        // If Host leaves explicitly, destroy room
         if (room.hostSocketId === socket.id) {
             await Room.deleteOne({ _id: room._id });
             io.to(roomId).emit('room_destroyed', 'Host ended the session.');
             const sockets = await io.in(roomId).fetchSockets();
             sockets.forEach(s => s.disconnect(true));
         } else {
-            // Player leaves explicitly
             room.players = room.players.filter(p => p.socketId !== socket.id);
             await room.save();
             io.to(room.hostSocketId).emit('player_left', { socketId: socket.id });
@@ -159,6 +150,7 @@ module.exports = (io, socket) => {
             room.players.forEach(player => {
                 if (player.cardMatrix.length === 0 && !player.isHost) {
                     player.cardMatrix = generateBingoCard();
+                    player.markedIndices = [12]; // *** Ensure this is set if generated late
                 }
             });
 
@@ -174,14 +166,15 @@ module.exports = (io, socket) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.hostSocketId !== socket.id) return;
 
-        let nextNum;
-        do {
-            nextNum = Math.floor(Math.random() * 75) + 1;
-        } while (room.numbersDrawn.includes(nextNum) && room.numbersDrawn.length < 75);
-
+        // *** FIXED: Check length BEFORE the loop to prevent Server Crash (Infinite Loop)
         if (room.numbersDrawn.length >= 75) {
             return socket.emit('error', 'All numbers called!');
         }
+
+        let nextNum;
+        do {
+            nextNum = Math.floor(Math.random() * 75) + 1;
+        } while (room.numbersDrawn.includes(nextNum)); // removed redundant length check here
 
         room.currentNumber = nextNum;
         room.numbersDrawn.push(nextNum);
@@ -201,21 +194,30 @@ module.exports = (io, socket) => {
         const player = room.players.find(p => p.socketId === socket.id);
         if (!player) return;
 
+        // Prevent marking the free space manually or invalid numbers
+        if (cellIndex === 12) return; 
+
         if (!room.numbersDrawn.includes(number)) {
             return socket.emit('action_error', "That number hasn't been called yet!");
         }
 
         const row = Math.floor(cellIndex / 5);
         const col = cellIndex % 5;
+        
+        // Security Check
         if (player.cardMatrix[row][col] !== number) {
             return socket.emit('action_error', "Cheating detected! Number mismatch.");
         }
 
         if (!player.markedIndices.includes(cellIndex)) {
             player.markedIndices.push(cellIndex);
+            
+            // Recalculate remaining needed for Bingo
             const remaining = calculateRemaining(player.markedIndices, room.winningPattern);
+            
             await room.save();
 
+            // Notify Host of player progress
             io.to(room.hostSocketId).emit('update_player_progress', {
                 playerId: player._id, 
                 remaining: remaining
@@ -233,6 +235,8 @@ module.exports = (io, socket) => {
         const player = room.players.find(p => p.socketId === socket.id);
         if (player) {
             player.cardMatrix = generateBingoCard();
+            // *** FIXED: Ensure free space is preserved on shuffle
+            player.markedIndices = [12]; 
             await room.save();
             socket.emit('card_shuffled', player.cardMatrix);
         }
@@ -298,8 +302,10 @@ module.exports = (io, socket) => {
         room.winner = null;
 
         room.players.forEach(p => {
-            p.markedIndices = [12];
-            p.cardMatrix = generateBingoCard();
+            p.markedIndices = [12]; // This was already correct in your original code
+            if(!p.isHost) {
+                 p.cardMatrix = generateBingoCard();
+            }
         });
 
         await room.save();
