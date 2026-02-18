@@ -2,16 +2,13 @@ const Room = require('../models/Room');
 const { v4: uuidv4 } = require('uuid');
 const { generateBingoCard, calculateRemaining, checkWin } = require('../utils/bingoGame');
 
-
 module.exports = (io, socket) => {
 
     // --- CREATE ROOM ---
     socket.on('create_room', async ({ hostName, winningPattern }) => {
         try {
-            // Generate a short 6-char Room Code
             const roomId = uuidv4().substring(0, 6).toUpperCase();
 
-            // Create the Host Player Object
             const hostPlayer = {
                 socketId: socket.id,
                 name: hostName,
@@ -19,7 +16,6 @@ module.exports = (io, socket) => {
                 cardMatrix: []
             };
 
-            // Save to MongoDB
             const newRoom = new Room({
                 roomId,
                 winningPattern,
@@ -28,13 +24,12 @@ module.exports = (io, socket) => {
             });
 
             await newRoom.save();
-
-            // Join the Socket Room
             socket.join(roomId);
 
-            // Tell the Client success
-            socket.emit('room_created', { roomId, player: hostPlayer });
+            const savedRoom = await Room.findOne({ roomId });
+            const savedHost = savedRoom.players[0];
 
+            socket.emit('room_created', { roomId, player: savedHost });
             console.log(`Room ${roomId} created by ${hostName}`);
 
         } catch (err) {
@@ -43,8 +38,8 @@ module.exports = (io, socket) => {
         }
     });
 
-    // --- JOIN ROOM ---
-    socket.on('join_room', async ({ roomId, playerName }) => {
+    // --- JOIN ROOM (Handles New Joins AND Reconnections) ---
+    socket.on('join_room', async ({ roomId, playerName, playerId }) => {
         try {
             const room = await Room.findOne({ roomId });
 
@@ -52,7 +47,43 @@ module.exports = (io, socket) => {
                 return socket.emit('error', 'Room not found');
             }
 
-            // Check if Game Started (Spectator Mode logic)
+            // RECONNECTION ATTEMPT
+            if (playerId) {
+                const existingPlayer = room.players.find(p => p._id.toString() === playerId);
+                
+                if (existingPlayer) {
+                    // Update the socket ID to the new connection
+                    existingPlayer.socketId = socket.id;
+                    
+                    // If it was the host, update the main host reference
+                    if (existingPlayer.isHost) {
+                        room.hostSocketId = socket.id;
+                    }
+
+                    await room.save();
+                    socket.join(roomId);
+
+                    // Restore client state
+                    socket.emit('room_joined', {
+                        roomId,
+                        player: existingPlayer,
+                        playersList: room.players
+                    });
+                    
+                    // If game is playing, ensure they get current game state
+                    if (room.status === 'playing') {
+                        socket.emit('game_started', { status: 'playing' });
+                        socket.emit('number_rolled', { 
+                            number: room.currentNumber, 
+                            history: room.numbersDrawn 
+                        });
+                    }
+                    
+                    return;
+                }
+            }
+
+            // NEW PLAYER LOGIC
             if (room.status === 'playing') {
                 socket.join(roomId);
                 socket.emit('spectator_joined', {
@@ -62,7 +93,6 @@ module.exports = (io, socket) => {
                 return;
             }
 
-            // Create Player
             const newPlayer = {
                 socketId: socket.id,
                 name: playerName,
@@ -70,22 +100,21 @@ module.exports = (io, socket) => {
                 isHost: false
             };
 
-            // Add to DB
             room.players.push(newPlayer);
             await room.save();
-
-            // Join Socket Room
             socket.join(roomId);
 
-            // Tell the specific user they joined
+            // Get the saved player to ensure we have the _id
+            const updatedRoom = await Room.findOne({ roomId });
+            const savedPlayer = updatedRoom.players.find(p => p.socketId === socket.id);
+
             socket.emit('room_joined', {
                 roomId,
-                player: newPlayer,
-                playersList: room.players
+                player: savedPlayer,
+                playersList: updatedRoom.players
             });
 
-            // Notify everyone else in the room (to update their sidebar)
-            io.to(roomId).emit('update_player_list', room.players);
+            io.to(roomId).emit('update_player_list', updatedRoom.players);
 
         } catch (err) {
             console.error(err);
@@ -93,47 +122,38 @@ module.exports = (io, socket) => {
         }
     });
 
-    // DISCONNECT
-    socket.on('disconnect', async () => {
-        // 1. Find room where this socket is a player or host
-        const room = await Room.findOne({
-            $or: [{ hostSocketId: socket.id }, { "players.socketId": socket.id }]
-        });
+    // --- LEAVE ROOM (Explicit Action) ---
+    socket.on('leave_room', async ({ roomId, playerId }) => {
+        const room = await Room.findOne({ roomId });
+        if (!room) return;
 
-        if (room) {
-            // CASE A: HOST LEFT
-            if (room.hostSocketId === socket.id) {
-                // Delete room from DB
-                await Room.deleteOne({ _id: room._id });
-
-                // Kick everyone out
-                io.to(room.roomId).emit('room_destroyed', 'Host ended the session.');
-
-                // Force disconnect all sockets in this room
-                const sockets = await io.in(room.roomId).fetchSockets();
-                sockets.forEach(s => s.disconnect(true));
-            }
-
-            // CASE B: PLAYER LEFT
-            else {
-                // Remove player from array
-                room.players = room.players.filter(p => p.socketId !== socket.id);
-                await room.save();
-
-                // Update Host's list
-                io.to(room.hostSocketId).emit('player_left', { socketId: socket.id });
-            }
+        // If Host leaves explicitly, destroy room
+        if (room.hostSocketId === socket.id) {
+            await Room.deleteOne({ _id: room._id });
+            io.to(roomId).emit('room_destroyed', 'Host ended the session.');
+            const sockets = await io.in(roomId).fetchSockets();
+            sockets.forEach(s => s.disconnect(true));
+        } else {
+            // Player leaves explicitly
+            room.players = room.players.filter(p => p.socketId !== socket.id);
+            await room.save();
+            io.to(room.hostSocketId).emit('player_left', { socketId: socket.id });
+            io.to(roomId).emit('update_player_list', room.players);
         }
     });
 
+    // --- DISCONNECT (Handle unexpected closes/reloads) ---
+    socket.on('disconnect', async () => {
+        console.log(`User disconnected: ${socket.id}`);
+    });
+
+    
     socket.on('start_game', async ({ roomId }) => {
         try {
             const room = await Room.findOne({ roomId });
             if (!room || room.hostSocketId !== socket.id) return;
 
             room.status = 'playing';
-
-            // Ensure everyone has a fresh card if they don't already
             room.players.forEach(player => {
                 if (player.cardMatrix.length === 0 && !player.isHost) {
                     player.cardMatrix = generateBingoCard();
@@ -152,7 +172,6 @@ module.exports = (io, socket) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.hostSocketId !== socket.id) return;
 
-        // Generate a number 1-75 that isn't in room.numbersDrawn
         let nextNum;
         do {
             nextNum = Math.floor(Math.random() * 75) + 1;
@@ -166,7 +185,6 @@ module.exports = (io, socket) => {
         room.numbersDrawn.push(nextNum);
         await room.save();
 
-        // Broadcast to everyone
         io.to(roomId).emit('number_rolled', {
             number: nextNum,
             history: room.numbersDrawn
@@ -175,39 +193,29 @@ module.exports = (io, socket) => {
 
     // PLAYER MARKS CARD
     socket.on('mark_number', async ({ roomId, number, cellIndex }) => {
-        // cellIndex is 0-24
         const room = await Room.findOne({ roomId });
         if (!room) return;
 
         const player = room.players.find(p => p.socketId === socket.id);
         if (!player) return;
 
-        // VALIDATION:
-        // Is the number actually drawn?
         if (!room.numbersDrawn.includes(number)) {
             return socket.emit('action_error', "That number hasn't been called yet!");
         }
 
-        // Does the player actually have this number at this index?
         const row = Math.floor(cellIndex / 5);
         const col = cellIndex % 5;
         if (player.cardMatrix[row][col] !== number) {
             return socket.emit('action_error', "Cheating detected! Number mismatch.");
         }
 
-        // Mark it if not already marked
         if (!player.markedIndices.includes(cellIndex)) {
             player.markedIndices.push(cellIndex);
-
-            // CALCULATE "BEST REMAINING" FOR HOST UI
             const remaining = calculateRemaining(player.markedIndices, room.winningPattern);
-
-            // Save & Notify Host
             await room.save();
 
-            // Only send this update to the Host (to save bandwidth)
             io.to(room.hostSocketId).emit('update_player_progress', {
-                playerId: player._id, // or socketId
+                playerId: player._id, 
                 remaining: remaining
             });
 
@@ -215,7 +223,7 @@ module.exports = (io, socket) => {
         }
     });
 
-    // SHUFFLE CARD (Waiting Room Only)
+    // SHUFFLE CARD
     socket.on('request_shuffle', async ({ roomId }) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.status !== 'waiting') return;
@@ -233,14 +241,11 @@ module.exports = (io, socket) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.hostSocketId !== socket.id) return;
 
-        // Remove from DB
         room.players = room.players.filter(p => p.socketId !== targetSocketId);
         await room.save();
 
-        // Notify Room (update lists)
         io.to(roomId).emit('update_player_list', room.players);
 
-        // Force Disconnect the specific user
         const targetSocket = io.sockets.sockets.get(targetSocketId);
         if (targetSocket) {
             targetSocket.emit('room_destroyed', 'You were kicked by the host.');
@@ -248,7 +253,7 @@ module.exports = (io, socket) => {
         }
     });
 
-    // UPDATE PATTERN (Before game starts)
+    // UPDATE PATTERN
     socket.on('update_pattern', async ({ roomId, pattern }) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.hostSocketId !== socket.id) return;
@@ -276,23 +281,20 @@ module.exports = (io, socket) => {
                 winningCard: player.cardMatrix
             });
         } else {
-            // Public shame for false bingo
             io.to(roomId).emit('false_bingo', { name: player.name });
         }
     });
 
-    // RESTART GAME (Host Only)
+    // RESTART GAME
     socket.on('restart_game', async ({ roomId }) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.hostSocketId !== socket.id) return;
 
-        // Reset State
         room.status = 'waiting';
         room.numbersDrawn = [];
         room.currentNumber = null;
         room.winner = null;
 
-        // Reset Players
         room.players.forEach(p => {
             p.markedIndices = [12];
             p.cardMatrix = generateBingoCard();

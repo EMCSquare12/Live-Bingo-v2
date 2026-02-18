@@ -114,9 +114,9 @@ const HostRoom = () => {
     }
   };
 
-  const handleCloseRoom = () => {
+ const handleCloseRoom = () => {
     if (confirm("Close room for everyone?")) {
-      disconnectSocket(); // This triggers cleanup in Context
+      disconnectSocket();
     }
   };
 
