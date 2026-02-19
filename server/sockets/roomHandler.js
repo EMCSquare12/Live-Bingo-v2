@@ -62,7 +62,7 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
 
                    socket.emit('room_joined', {
                         roomId,
-                        player: existingPlayer.toObject(),
+                        player: existingPlayer ? existingPlayer.toObject() : savedPlayer.toObject(),
                         playersList: room.players,
                         status: room.status, 
                         numbersDrawn: room.numbersDrawn,
@@ -84,7 +84,7 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
             }
 
             // NEW PLAYER
-            if (room.status === 'playing') {
+           if (room.status === 'playing') {
                 socket.join(roomId);
                 socket.emit('spectator_joined', {
                     gameState: room,
@@ -101,17 +101,24 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
                 markedIndices: [12]
             };
 
-            room.players.push(newPlayer);
-            await room.save();
+            // ATOMIC UPDATE: Push the player directly to the array without .save()
+            const updatedRoom = await Room.findOneAndUpdate(
+                { roomId },
+                { $push: { players: newPlayer } },
+                { new: true }
+            );
+
             socket.join(roomId);
 
-            const updatedRoom = await Room.findOne({ roomId });
             const savedPlayer = updatedRoom.players.find(p => p.socketId === socket.id);
 
             socket.emit('room_joined', {
                 roomId,
                 player: savedPlayer.toObject(),
-                playersList: updatedRoom.players
+                playersList: updatedRoom.players,
+                status: updatedRoom.status, 
+                currentNumber: updatedRoom.currentNumber,
+                numbersDrawn: updatedRoom.numbersDrawn
             });
 
             io.to(roomId).emit('update_player_list', updatedRoom.players);
@@ -199,7 +206,6 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
         const player = room.players.find(p => p.socketId === socket.id);
         if (!player) return;
 
-        // Prevent marking the free space manually or invalid numbers
         if (cellIndex === 12) return; 
 
         if (!room.numbersDrawn.includes(number)) {
@@ -209,44 +215,66 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
         const row = Math.floor(cellIndex / 5);
         const col = cellIndex % 5;
         
-        // Security Check
         if (player.cardMatrix[row][col] !== number) {
             return socket.emit('action_error', "Cheating detected! Number mismatch.");
         }
 
         if (!player.markedIndices.includes(cellIndex)) {
-            player.markedIndices.push(cellIndex);
-            
-            // Recalculate remaining needed for Bingo
-            const remaining = calculateRemaining(player.markedIndices, room.winningPattern);
-            
-            await room.save();
+            // ATOMIC UPDATE: Push the marked index directly
+            const updatedRoom = await Room.findOneAndUpdate(
+                { roomId, "players.socketId": socket.id },
+                { $push: { "players.$.markedIndices": cellIndex } },
+                { new: true }
+            );
 
-            // Notify Host of player progress
-            io.to(room.hostSocketId).emit('update_player_progress', {
-                playerId: player._id, 
-                remaining: remaining
-            });
+            if (updatedRoom) {
+                const updatedPlayer = updatedRoom.players.find(p => p.socketId === socket.id);
+                const remaining = calculateRemaining(updatedPlayer.markedIndices, updatedRoom.winningPattern);
 
-            socket.emit('mark_success', { cellIndex });
+                io.to(updatedRoom.hostSocketId).emit('update_player_progress', {
+                    playerId: updatedPlayer._id, 
+                    remaining: remaining
+                });
+
+                socket.emit('mark_success', { cellIndex });
+            }
         }
     });
 
     // SHUFFLE CARD
-    socket.on('request_shuffle', async ({ roomId }) => {
-        const room = await Room.findOne({ roomId });
+    socket.on('request_shuffle', async ({ roomId, playerId }) => {
+        try {
+            const room = await Room.findOne({ roomId });
+            if (!room) return socket.emit('action_error', 'Room not found');
 
-        if (!room) return;
-        if (room.status !== 'waiting') {
-            return socket.emit('action_error', 'Cannot shuffle: Game has already started!');
-        }
+            if (room.status !== 'waiting') {
+                return socket.emit('action_error', 'Cannot shuffle: Game has already started!');
+            }
 
-        const player = room.players.find(p => p.socketId === socket.id);
-        if (player) {
-            player.cardMatrix = generateBingoCard();
-            player.markedIndices = [12]; 
-            await room.save();
-            socket.emit('card_shuffled', player.cardMatrix);
+            const newMatrix = generateBingoCard();
+            
+            // Query by playerId if available, fallback to socket.id
+            const playerQuery = playerId ? { "players._id": playerId } : { "players.socketId": socket.id };
+            
+            // ATOMIC UPDATE: Directly set the specific player's matrix in the database
+            const updatedRoom = await Room.findOneAndUpdate(
+                { roomId, ...playerQuery },
+                { 
+                    $set: { 
+                        "players.$.cardMatrix": newMatrix,
+                        "players.$.markedIndices": [12] 
+                    } 
+                },
+                { new: true } // Returns the updated document
+            );
+
+            if (updatedRoom) {
+                socket.emit('card_shuffled', newMatrix);
+            } else {
+                socket.emit('action_error', 'Player not found in this room');
+            }
+        } catch (error) {
+            console.error("Shuffle error:", error);
         }
     });
 

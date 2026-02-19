@@ -99,7 +99,10 @@ const PlayerRoom = () => {
   };
 
   const handleShuffle = () => {
-    socket.emit("request_shuffle", { roomId: room });
+    socket.emit("request_shuffle", { 
+      roomId: room, 
+      playerId: player?._id 
+    });
   };
 
   return (
