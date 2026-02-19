@@ -62,23 +62,15 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
 
                    socket.emit('room_joined', {
                         roomId,
-                        player: existingPlayer ? existingPlayer.toObject() : savedPlayer.toObject(),
+                        player: existingPlayer.toObject(),
                         playersList: room.players,
                         status: room.status, 
                         numbersDrawn: room.numbersDrawn,
-                        currentNumber: room.currentNumbers
+                        currentNumber: room.currentNumber
                     });
 
                     socket.emit('update_player_list', room.players);
                     
-                    if (room.status === 'playing') {
-                        socket.emit('game_started', { status: 'playing' });
-                        // Send current number and history on reconnect
-                        socket.emit('number_rolled', { 
-                            number: room.currentNumber, 
-                            history: room.numbersDrawn 
-                        });
-                    }
                     return;
                 }
             }

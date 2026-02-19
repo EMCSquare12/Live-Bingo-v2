@@ -17,6 +17,7 @@ export const useSocket = () => {
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [initialGameState, setInitialGameState] = useState(null);
   const [player, setPlayer] = useState(() => {
     const saved = sessionStorage.getItem("bingoSession");
     return saved ? JSON.parse(saved).player : null;
@@ -52,17 +53,32 @@ useEffect(() => {
       }
     });
 
-    newSocket.on("room_joined", ({ roomId, player }) => {
-      setRoom(roomId);
-      setPlayer(player);
-      saveSession(roomId, player);
+    newSocket.on("room_joined", (data) => {
+      setRoom(data.roomId);
+      setPlayer(data.player);
+      
+      // Store the synced game state provided by the server!
+      setInitialGameState({
+        status: data.status || "waiting",
+        numbersDrawn: data.numbersDrawn || [],
+        currentNumber: data.currentNumber || null
+      });
+
+      saveSession(data.roomId, data.player);
       setIsRestoring(false);
     });
 
     // Handle re-joining as a spectator if the game started
     newSocket.on("spectator_joined", ({ gameState }) => {
       setRoom(gameState.roomId);
-      setPlayer({ name: player?.name || "Spectator", isSpectator: true, isHost: false });
+      setPlayer((prev) => ({ name: prev?.name || "Spectator", isSpectator: true, isHost: false }));
+      
+      // Spectators need to know current progress too
+      setInitialGameState({
+        status: gameState.status || "waiting",
+        numbersDrawn: gameState.numbersDrawn || [],
+        currentNumber: gameState.currentNumber || null
+      });
       setIsRestoring(false);
     });
 
@@ -84,6 +100,11 @@ useEffect(() => {
     newSocket.on("room_created", ({ roomId, player }) => {
       setRoom(roomId);
       setPlayer(player);
+      setInitialGameState({
+        status: "waiting",
+        numbersDrawn: [],
+        currentNumber: null
+      });
       saveSession(roomId, player);
       setIsRestoring(false);
     });
@@ -125,7 +146,8 @@ useEffect(() => {
       room,
       setRoom,
       disconnectSocket,
-      isRestoring, 
+      isRestoring,
+      initialGameState
     }),
     [socket, isConnected, player, room, isRestoring],
   );
