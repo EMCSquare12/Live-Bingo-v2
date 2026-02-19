@@ -63,7 +63,10 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
                    socket.emit('room_joined', {
                         roomId,
                         player: existingPlayer.toObject(),
-                        playersList: room.players
+                        playersList: room.players,
+                        status: room.status, 
+                        numbersDrawn: room.numbersDrawn,
+                        currentNumber: room.currentNumbers
                     });
 
                     socket.emit('update_player_list', room.players);
@@ -232,12 +235,15 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
     // SHUFFLE CARD
     socket.on('request_shuffle', async ({ roomId }) => {
         const room = await Room.findOne({ roomId });
-        if (!room || room.status !== 'waiting') return;
+
+        if (!room) return;
+        if (room.status !== 'waiting') {
+            return socket.emit('action_error', 'Cannot shuffle: Game has already started!');
+        }
 
         const player = room.players.find(p => p.socketId === socket.id);
         if (player) {
             player.cardMatrix = generateBingoCard();
-            // *** FIXED: Ensure free space is preserved on shuffle
             player.markedIndices = [12]; 
             await room.save();
             socket.emit('card_shuffled', player.cardMatrix);

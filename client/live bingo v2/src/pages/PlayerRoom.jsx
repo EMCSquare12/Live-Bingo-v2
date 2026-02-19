@@ -28,6 +28,8 @@ const PlayerRoom = () => {
     };
 
     const onNumberRolled = ({ number, history }) => {
+      setGameState("playing");
+      
       setLastCalledNumber(number);
       setCalledHistory(history);
     };
