@@ -22,9 +22,7 @@ const LandingPage = () => {
     // Listen for successful Room Creation
     socket.on("room_created", ({ roomId, player }) => {
       setRoom(roomId);
-      setPlayer(player);
-
-      sessionStorage.setItem("bingoSession", JSON.stringify({ roomId, player }));
+      setPlayer(player); // Save to context
       toast.success(`Room ${roomId} Created!`);
       navigate("/host");
     });

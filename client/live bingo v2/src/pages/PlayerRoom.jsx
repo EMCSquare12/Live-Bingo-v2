@@ -6,16 +6,19 @@ import toast from "react-hot-toast";
 import BingoCard from "../components/BingoCard";
 
 const PlayerRoom = () => {
-  const { socket, room, player, disconnectSocket, initialGameState } = useSocket();
+  const { socket, room, player, disconnectSocket } = useSocket();
   const navigate = useNavigate();
 
-  // Initialize Game State directly from the context instead of hardcoding "waiting"
-  const [gameState, setGameState] = useState(initialGameState?.status || "waiting");
+  // Local Game State
+  const [gameState, setGameState] = useState("waiting");
   const [cardMatrix, setCardMatrix] = useState(player?.cardMatrix || []);
-  const [markedIndices, setMarkedIndices] = useState(player?.markedIndices || [12]);
-  const [lastCalledNumber, setLastCalledNumber] = useState(initialGameState?.currentNumber || null);
-  const [calledHistory, setCalledHistory] = useState(initialGameState?.numbersDrawn || []);
+  const [markedIndices, setMarkedIndices] = useState(
+    player?.markedIndices || [12],
+  );
+  const [lastCalledNumber, setLastCalledNumber] = useState(null);
+  const [calledHistory, setCalledHistory] = useState([]);
 
+  // --- SOCKET LISTENERS ---
   useEffect(() => {
     if (!socket) return;
 
@@ -25,8 +28,6 @@ const PlayerRoom = () => {
     };
 
     const onNumberRolled = ({ number, history }) => {
-      setGameState("playing");
-      
       setLastCalledNumber(number);
       setCalledHistory(history);
     };
@@ -49,18 +50,6 @@ const PlayerRoom = () => {
       toast.success("Card Shuffled!");
     };
 
-    const onGameReset = ({ message, players }) => {
-      setGameState("waiting");
-      setLastCalledNumber(null);
-      setCalledHistory([]);
-      setMarkedIndices([12]);
-      
-      const me = players.find((p) => p.socketId === socket.id || p._id === player?._id);
-      if (me) setCardMatrix(me.cardMatrix);
-      
-      toast(message || "Game Restarted!", { icon: "🔄" });
-    };
-
     const onActionError = (msg) => toast.error(msg);
 
     // Attach listeners
@@ -70,7 +59,6 @@ const PlayerRoom = () => {
     socket.on("game_over", onGameOver);
     socket.on("card_shuffled", onCardShuffled);
     socket.on("action_error", onActionError);
-    socket.on("game_reset", onGameReset)
 
     // Cleanup
     return () => {
@@ -80,7 +68,6 @@ const PlayerRoom = () => {
       socket.off("game_over", onGameOver);
       socket.off("card_shuffled", onCardShuffled);
       socket.off("action_error", onActionError);
-      socket.off("game_reset", onGameReset);
     };
   }, [socket, player]);
 
@@ -110,10 +97,7 @@ const PlayerRoom = () => {
   };
 
   const handleShuffle = () => {
-    socket.emit("request_shuffle", { 
-      roomId: room, 
-      playerId: player?._id 
-    });
+    socket.emit("request_shuffle", { roomId: room });
   };
 
   return (

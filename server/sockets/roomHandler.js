@@ -2,21 +2,24 @@ const Room = require('../models/Room');
 const { v4: uuidv4 } = require('uuid');
 const { generateBingoCard, calculateRemaining, checkWin } = require('../utils/bingoGame');
 
+
 module.exports = (io, socket) => {
 
     // --- CREATE ROOM ---
-socket.on('create_room', async ({ hostName, winningPattern }) => {
+    socket.on('create_room', async ({ hostName, winningPattern }) => {
         try {
+            // Generate a short 6-char Room Code
             const roomId = uuidv4().substring(0, 6).toUpperCase();
 
+            // Create the Host Player Object
             const hostPlayer = {
                 socketId: socket.id,
                 name: hostName,
                 isHost: true,
-                cardMatrix: [], 
-                markedIndices: [] // Host usually doesn't play, so no free space needed
+                cardMatrix: []
             };
 
+            // Save to MongoDB
             const newRoom = new Room({
                 roomId,
                 winningPattern,
@@ -25,12 +28,13 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
             });
 
             await newRoom.save();
-            socket.join(roomId);
-            
-            const savedRoom = await Room.findOne({ roomId });
-            const savedHost = savedRoom.players[0].toObject();
 
-            socket.emit('room_created', { roomId, player: savedHost });
+            // Join the Socket Room
+            socket.join(roomId);
+
+            // Tell the Client success
+            socket.emit('room_created', { roomId, player: hostPlayer });
+
             console.log(`Room ${roomId} created by ${hostName}`);
 
         } catch (err) {
@@ -39,8 +43,8 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
         }
     });
 
-    // --- JOIN ROOM (Handles New Joins AND Reconnections) ---
-    socket.on('join_room', async ({ roomId, playerName, playerId }) => {
+    // --- JOIN ROOM ---
+    socket.on('join_room', async ({ roomId, playerName }) => {
         try {
             const room = await Room.findOne({ roomId });
 
@@ -48,35 +52,8 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
                 return socket.emit('error', 'Room not found');
             }
 
-            // RECONNECTION
-            if (playerId) {
-                const existingPlayer = room.players.find(p => p._id.toString() === playerId);
-                
-                if (existingPlayer) {
-                    existingPlayer.socketId = socket.id;
-                    if (existingPlayer.isHost) {
-                        room.hostSocketId = socket.id;
-                    }
-                    await room.save();
-                    socket.join(roomId);
-
-                   socket.emit('room_joined', {
-                        roomId,
-                        player: existingPlayer.toObject(),
-                        playersList: room.players,
-                        status: room.status, 
-                        numbersDrawn: room.numbersDrawn,
-                        currentNumber: room.currentNumber
-                    });
-
-                    socket.emit('update_player_list', room.players);
-                    
-                    return;
-                }
-            }
-
-            // NEW PLAYER
-           if (room.status === 'playing') {
+            // Check if Game Started (Spectator Mode logic)
+            if (room.status === 'playing') {
                 socket.join(roomId);
                 socket.emit('spectator_joined', {
                     gameState: room,
@@ -85,35 +62,30 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
                 return;
             }
 
+            // Create Player
             const newPlayer = {
                 socketId: socket.id,
                 name: playerName,
                 cardMatrix: generateBingoCard(),
-                isHost: false,
-                markedIndices: [12]
+                isHost: false
             };
 
-            // ATOMIC UPDATE: Push the player directly to the array without .save()
-            const updatedRoom = await Room.findOneAndUpdate(
-                { roomId },
-                { $push: { players: newPlayer } },
-                { new: true }
-            );
+            // Add to DB
+            room.players.push(newPlayer);
+            await room.save();
 
+            // Join Socket Room
             socket.join(roomId);
 
-            const savedPlayer = updatedRoom.players.find(p => p.socketId === socket.id);
-
+            // Tell the specific user they joined
             socket.emit('room_joined', {
                 roomId,
-                player: savedPlayer.toObject(),
-                playersList: updatedRoom.players,
-                status: updatedRoom.status, 
-                currentNumber: updatedRoom.currentNumber,
-                numbersDrawn: updatedRoom.numbersDrawn
+                player: newPlayer,
+                playersList: room.players
             });
 
-            io.to(roomId).emit('update_player_list', updatedRoom.players);
+            // Notify everyone else in the room (to update their sidebar)
+            io.to(roomId).emit('update_player_list', room.players);
 
         } catch (err) {
             console.error(err);
@@ -121,40 +93,50 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
         }
     });
 
-    // --- LEAVE ROOM (Explicit Action) ---
-    socket.on('leave_room', async ({ roomId, playerId }) => {
-        const room = await Room.findOne({ roomId });
-        if (!room) return;
+    // DISCONNECT
+    socket.on('disconnect', async () => {
+        // 1. Find room where this socket is a player or host
+        const room = await Room.findOne({
+            $or: [{ hostSocketId: socket.id }, { "players.socketId": socket.id }]
+        });
 
-        if (room.hostSocketId === socket.id) {
-            await Room.deleteOne({ _id: room._id });
-            io.to(roomId).emit('room_destroyed', 'Host ended the session.');
-            const sockets = await io.in(roomId).fetchSockets();
-            sockets.forEach(s => s.disconnect(true));
-        } else {
-            room.players = room.players.filter(p => p.socketId !== socket.id);
-            await room.save();
-            io.to(room.hostSocketId).emit('player_left', { socketId: socket.id });
-            io.to(roomId).emit('update_player_list', room.players);
+        if (room) {
+            // CASE A: HOST LEFT
+            if (room.hostSocketId === socket.id) {
+                // Delete room from DB
+                await Room.deleteOne({ _id: room._id });
+
+                // Kick everyone out
+                io.to(room.roomId).emit('room_destroyed', 'Host ended the session.');
+
+                // Force disconnect all sockets in this room
+                const sockets = await io.in(room.roomId).fetchSockets();
+                sockets.forEach(s => s.disconnect(true));
+            }
+
+            // CASE B: PLAYER LEFT
+            else {
+                // Remove player from array
+                room.players = room.players.filter(p => p.socketId !== socket.id);
+                await room.save();
+
+                // Update Host's list
+                io.to(room.hostSocketId).emit('player_left', { socketId: socket.id });
+            }
         }
     });
 
-    // --- DISCONNECT (Handle unexpected closes/reloads) ---
-    socket.on('disconnect', async () => {
-        console.log(`User disconnected: ${socket.id}`);
-    });
-
-    
     socket.on('start_game', async ({ roomId }) => {
         try {
             const room = await Room.findOne({ roomId });
             if (!room || room.hostSocketId !== socket.id) return;
 
             room.status = 'playing';
+
+            // Ensure everyone has a fresh card if they don't already
             room.players.forEach(player => {
                 if (player.cardMatrix.length === 0 && !player.isHost) {
                     player.cardMatrix = generateBingoCard();
-                    player.markedIndices = [12]; // *** Ensure this is set if generated late
                 }
             });
 
@@ -170,20 +152,21 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.hostSocketId !== socket.id) return;
 
-        // *** FIXED: Check length BEFORE the loop to prevent Server Crash (Infinite Loop)
-        if (room.numbersDrawn.length >= 75) {
-            return socket.emit('error', 'All numbers called!');
-        }
-
+        // Generate a number 1-75 that isn't in room.numbersDrawn
         let nextNum;
         do {
             nextNum = Math.floor(Math.random() * 75) + 1;
-        } while (room.numbersDrawn.includes(nextNum)); // removed redundant length check here
+        } while (room.numbersDrawn.includes(nextNum) && room.numbersDrawn.length < 75);
+
+        if (room.numbersDrawn.length >= 75) {
+            return socket.emit('error', 'All numbers called!');
+        }
 
         room.currentNumber = nextNum;
         room.numbersDrawn.push(nextNum);
         await room.save();
 
+        // Broadcast to everyone
         io.to(roomId).emit('number_rolled', {
             number: nextNum,
             history: room.numbersDrawn
@@ -192,81 +175,56 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
 
     // PLAYER MARKS CARD
     socket.on('mark_number', async ({ roomId, number, cellIndex }) => {
+        // cellIndex is 0-24
         const room = await Room.findOne({ roomId });
         if (!room) return;
 
         const player = room.players.find(p => p.socketId === socket.id);
         if (!player) return;
 
-        if (cellIndex === 12) return; 
-
+        // VALIDATION:
+        // Is the number actually drawn?
         if (!room.numbersDrawn.includes(number)) {
             return socket.emit('action_error', "That number hasn't been called yet!");
         }
 
+        // Does the player actually have this number at this index?
         const row = Math.floor(cellIndex / 5);
         const col = cellIndex % 5;
-        
         if (player.cardMatrix[row][col] !== number) {
             return socket.emit('action_error', "Cheating detected! Number mismatch.");
         }
 
+        // Mark it if not already marked
         if (!player.markedIndices.includes(cellIndex)) {
-            // ATOMIC UPDATE: Push the marked index directly
-            const updatedRoom = await Room.findOneAndUpdate(
-                { roomId, "players.socketId": socket.id },
-                { $push: { "players.$.markedIndices": cellIndex } },
-                { new: true }
-            );
+            player.markedIndices.push(cellIndex);
 
-            if (updatedRoom) {
-                const updatedPlayer = updatedRoom.players.find(p => p.socketId === socket.id);
-                const remaining = calculateRemaining(updatedPlayer.markedIndices, updatedRoom.winningPattern);
+            // CALCULATE "BEST REMAINING" FOR HOST UI
+            const remaining = calculateRemaining(player.markedIndices, room.winningPattern);
 
-                io.to(updatedRoom.hostSocketId).emit('update_player_progress', {
-                    playerId: updatedPlayer._id, 
-                    remaining: remaining
-                });
+            // Save & Notify Host
+            await room.save();
 
-                socket.emit('mark_success', { cellIndex });
-            }
+            // Only send this update to the Host (to save bandwidth)
+            io.to(room.hostSocketId).emit('update_player_progress', {
+                playerId: player._id, // or socketId
+                remaining: remaining
+            });
+
+            socket.emit('mark_success', { cellIndex });
         }
     });
 
-    // SHUFFLE CARD
-    socket.on('request_shuffle', async ({ roomId, playerId }) => {
-        try {
-            const room = await Room.findOne({ roomId });
-            if (!room) return socket.emit('action_error', 'Room not found');
+    // SHUFFLE CARD (Waiting Room Only)
+    socket.on('request_shuffle', async ({ roomId }) => {
+        const room = await Room.findOne({ roomId });
+        if (!room || room.status !== 'waiting') return;
 
-            if (room.status !== 'waiting') {
-                return socket.emit('action_error', 'Cannot shuffle: Game has already started!');
-            }
-
-            const newMatrix = generateBingoCard();
-            
-            // Query by playerId if available, fallback to socket.id
-            const playerQuery = playerId ? { "players._id": playerId } : { "players.socketId": socket.id };
-            
-            // ATOMIC UPDATE: Directly set the specific player's matrix in the database
-            const updatedRoom = await Room.findOneAndUpdate(
-                { roomId, ...playerQuery },
-                { 
-                    $set: { 
-                        "players.$.cardMatrix": newMatrix,
-                        "players.$.markedIndices": [12] 
-                    } 
-                },
-                { new: true } // Returns the updated document
-            );
-
-            if (updatedRoom) {
-                socket.emit('card_shuffled', newMatrix);
-            } else {
-                socket.emit('action_error', 'Player not found in this room');
-            }
-        } catch (error) {
-            console.error("Shuffle error:", error);
+        const player = room.players.find(p => p.socketId === socket.id);
+        if (player) {
+            player.cardMatrix = generateBingoCard();
+            await room.save();
+            socket.emit('card_shuffled', player.cardMatrix);
         }
     });
 
@@ -275,11 +233,14 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.hostSocketId !== socket.id) return;
 
+        // Remove from DB
         room.players = room.players.filter(p => p.socketId !== targetSocketId);
         await room.save();
 
+        // Notify Room (update lists)
         io.to(roomId).emit('update_player_list', room.players);
 
+        // Force Disconnect the specific user
         const targetSocket = io.sockets.sockets.get(targetSocketId);
         if (targetSocket) {
             targetSocket.emit('room_destroyed', 'You were kicked by the host.');
@@ -287,7 +248,7 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
         }
     });
 
-    // UPDATE PATTERN
+    // UPDATE PATTERN (Before game starts)
     socket.on('update_pattern', async ({ roomId, pattern }) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.hostSocketId !== socket.id) return;
@@ -315,25 +276,26 @@ socket.on('create_room', async ({ hostName, winningPattern }) => {
                 winningCard: player.cardMatrix
             });
         } else {
+            // Public shame for false bingo
             io.to(roomId).emit('false_bingo', { name: player.name });
         }
     });
 
-    // RESTART GAME
+    // RESTART GAME (Host Only)
     socket.on('restart_game', async ({ roomId }) => {
         const room = await Room.findOne({ roomId });
         if (!room || room.hostSocketId !== socket.id) return;
 
+        // Reset State
         room.status = 'waiting';
         room.numbersDrawn = [];
         room.currentNumber = null;
         room.winner = null;
 
+        // Reset Players
         room.players.forEach(p => {
-            p.markedIndices = [12]; // This was already correct in your original code
-            if(!p.isHost) {
-                 p.cardMatrix = generateBingoCard();
-            }
+            p.markedIndices = [12];
+            p.cardMatrix = generateBingoCard();
         });
 
         await room.save();

@@ -6,13 +6,12 @@ import PlayerList from "../components/PlayerList";
 import PatternPicker from "../components/PatternPicker";
 
 const HostRoom = () => {
-  const { socket, room, player, disconnectSocket, initialGameState } = useSocket();
+  const { socket, room, player, disconnectSocket } = useSocket();
 
-  // Initialize Game State from the context
-  const [gameState, setGameState] = useState(initialGameState?.status || "waiting");
-  const [currentNumber, setCurrentNumber] = useState(initialGameState?.currentNumber || null);
-  const [history, setHistory] = useState(initialGameState?.numbersDrawn || []);
-  
+  // Game State
+  const [gameState, setGameState] = useState("waiting");
+  const [currentNumber, setCurrentNumber] = useState(null);
+  const [history, setHistory] = useState([]);
   const [players, setPlayers] = useState([]);
   const [winner, setWinner] = useState(null);
 
@@ -50,14 +49,6 @@ const HostRoom = () => {
       );
     });
 
-    socket.on("game_reset", ({ players: resetPlayers }) => {
-      setPlayers(resetPlayers.filter((p) => !p.isHost));
-      setGameState("waiting");
-      setHistory([]);
-      setCurrentNumber(null);
-      setWinner(null);
-    });
-
     socket.on("game_over", ({ winner }) => {
       setGameState("ended");
       setWinner(winner);
@@ -70,7 +61,6 @@ const HostRoom = () => {
       socket.off("number_rolled");
       socket.off("update_player_progress");
       socket.off("game_over");
-      socket.off("game_reset");
     };
   }, [socket]);
 
@@ -114,15 +104,19 @@ const HostRoom = () => {
     }
   };
 
- const handleRestart = () => {
+  const handleRestart = () => {
     if (confirm("Restart Game? All progress will be lost.")) {
       socket.emit("restart_game", { roomId: room });
+      setGameState("waiting");
+      setHistory([]);
+      setCurrentNumber(null);
+      setWinner(null);
     }
   };
 
- const handleCloseRoom = () => {
+  const handleCloseRoom = () => {
     if (confirm("Close room for everyone?")) {
-      disconnectSocket();
+      disconnectSocket(); // This triggers cleanup in Context
     }
   };
 
