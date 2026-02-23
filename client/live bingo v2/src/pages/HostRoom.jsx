@@ -5,6 +5,16 @@ import toast from "react-hot-toast";
 import PlayerList from "../components/PlayerList";
 import PatternPicker from "../components/PatternPicker";
 
+// Helper to determine the BINGO letter
+const getBingoLetter = (num) => {
+  if (!num) return "";
+  if (num <= 15) return "B";
+  if (num <= 30) return "I";
+  if (num <= 45) return "N";
+  if (num <= 60) return "G";
+  return "O";
+};
+
 const HostRoom = () => {
   const { socket, room, player, disconnectSocket } = useSocket();
 
@@ -33,7 +43,6 @@ const HostRoom = () => {
     });
 
     socket.on("number_rolled", ({ number, history: newHistory }) => {
-      // Stop animation and show number
       setIsRolling(false);
       setCurrentNumber(number);
       setHistory(newHistory);
@@ -80,14 +89,12 @@ const HostRoom = () => {
     if (isRolling) return;
     setIsRolling(true);
 
-    // Fake animation before sending request
     let i = 0;
     const interval = setInterval(() => {
       setCurrentNumber(Math.floor(Math.random() * 75) + 1);
       i++;
       if (i > 10) {
         clearInterval(interval);
-        // Ask server for the REAL number
         socket.emit("roll_number", { roomId: room });
       }
     }, 100);
@@ -99,7 +106,6 @@ const HostRoom = () => {
         roomId: room,
         targetSocketId: playerSocketId,
       });
-      // Optimistic update
       setPlayers((prev) => prev.filter((p) => p.socketId !== playerSocketId));
     }
   };
@@ -116,14 +122,20 @@ const HostRoom = () => {
 
   const handleCloseRoom = () => {
     if (confirm("Close room for everyone?")) {
-      disconnectSocket(); // This triggers cleanup in Context
+      disconnectSocket();
     }
   };
 
+  // Group history by BINGO letter
+  const groupedHistory = { B: [], I: [], N: [], G: [], O: [] };
+  history.forEach((num) => {
+    groupedHistory[getBingoLetter(num)].push(num);
+  });
+
   return (
     <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-hidden">
-      {/* MAIN CONTENT (Left) */}
-      <div className="flex-1 flex flex-col p-4 md:p-8 relative">
+      {/* MAIN CONTENT (Left) - Made this scrollable so the growing history fits */}
+      <div className="flex-1 flex flex-col p-4 md:p-8 relative overflow-y-auto">
         {/* HEADER */}
         <div className="flex justify-between items-center mb-8 bg-gray-800 p-4 rounded-xl shadow-lg">
           <div>
@@ -160,13 +172,12 @@ const HostRoom = () => {
           </div>
         </div>
 
-        {/* SETTINGS MODAL (Conditional) */}
+        {/* SETTINGS MODAL */}
         {showSettings && (
           <div className="absolute top-24 right-8 z-50 bg-gray-800 p-4 border border-gray-600 rounded-xl shadow-2xl">
             <h3 className="font-bold mb-2">Edit Pattern</h3>
             <PatternPicker
               onPatternChange={(p) => {
-                // Emit update immediately if game hasn't started
                 socket.emit("update_pattern", { roomId: room, pattern: p });
               }}
             />
@@ -174,17 +185,23 @@ const HostRoom = () => {
         )}
 
         {/* GAME AREA */}
-        <div className="flex-1 flex flex-col items-center justify-center gap-8">
+        <div className="flex-1 flex flex-col items-center justify-center gap-8 min-h-[400px]">
           {/* THE BIG BALL (Current Number) */}
           <div
             className={`
-            w-48 h-48 rounded-full flex items-center justify-center 
+            w-48 h-48 rounded-full flex flex-col items-center justify-center 
             bg-gradient-to-br from-blue-600 to-purple-700 shadow-[0_0_30px_rgba(59,130,246,0.5)]
             border-4 border-white transition-all duration-300 transform
             ${isRolling ? "animate-bounce scale-110" : "scale-100"}
           `}
           >
-            <span className="text-8xl font-black text-white drop-shadow-md">
+            {/* Show BINGO Letter on top of the number when not rolling */}
+            {currentNumber && !isRolling && (
+              <span className="text-4xl font-black text-white/50 -mb-4 drop-shadow-md">
+                {getBingoLetter(currentNumber)}
+              </span>
+            )}
+            <span className="text-8xl font-black text-white drop-shadow-md z-10">
               {currentNumber || "--"}
             </span>
           </div>
@@ -224,25 +241,32 @@ const HostRoom = () => {
           </div>
         </div>
 
-        {/* HISTORY (Bottom) */}
-        <div className="mt-8 bg-gray-800 p-4 rounded-xl h-32 overflow-y-auto">
-          <h3 className="text-xs text-gray-400 font-bold mb-2 uppercase tracking-wide">
+        {/* SEGREGATED HISTORY */}
+        <div className="mt-8 bg-gray-800 p-4 rounded-xl w-full">
+          <h3 className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-wide border-b border-gray-700 pb-2">
             Call History
           </h3>
-          <div className="flex flex-wrap gap-2">
-            {history.map((num, i) => (
-              <span
-                key={i}
-                className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full text-sm font-bold border border-gray-600"
-              >
-                {num}
-              </span>
+          <div className="flex flex-col gap-3">
+            {["B", "I", "N", "G", "O"].map((letter) => (
+              <div key={letter} className="flex items-start gap-4">
+                <span className="w-8 h-8 flex items-center justify-center font-black text-2xl text-pink-500 drop-shadow-sm">
+                  {letter}
+                </span>
+                <div className="flex flex-wrap gap-2 flex-1">
+                  {groupedHistory[letter].map((num) => (
+                    <span
+                      key={num}
+                      className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full text-sm font-bold border border-gray-600 shadow-sm"
+                    >
+                      {num}
+                    </span>
+                  ))}
+                  {groupedHistory[letter].length === 0 && (
+                    <span className="text-gray-500 text-sm italic py-1">--</span>
+                  )}
+                </div>
+              </div>
             ))}
-            {history.length === 0 && (
-              <span className="text-gray-500 text-sm italic">
-                No numbers called yet.
-              </span>
-            )}
           </div>
         </div>
       </div>

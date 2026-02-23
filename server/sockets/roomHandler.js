@@ -16,7 +16,8 @@ module.exports = (io, socket) => {
                 socketId: socket.id,
                 name: hostName,
                 isHost: true,
-                cardMatrix: []
+                cardMatrix: [],
+                markedIndices: [12]
             };
 
             // Save to MongoDB
@@ -67,7 +68,8 @@ module.exports = (io, socket) => {
                 socketId: socket.id,
                 name: playerName,
                 cardMatrix: generateBingoCard(),
-                isHost: false
+                isHost: false,
+                markedIndices: [12]
             };
 
             // Add to DB
