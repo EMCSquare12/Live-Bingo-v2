@@ -95,34 +95,93 @@ module.exports = (io, socket) => {
 
     // DISCONNECT
     socket.on('disconnect', async () => {
-        // 1. Find room where this socket is a player or host
-        const room = await Room.findOne({
-            $or: [{ hostSocketId: socket.id }, { "players.socketId": socket.id }]
-        });
+        // Delay the cleanup by 5 seconds to allow page reloads to reconnect
+        setTimeout(async () => {
+            // Check if this specific socket ID is STILL recorded in the database
+            // If the user reconnected via rejoin_room, their socketId in the DB would have updated to a new one!
+            const room = await Room.findOne({
+                $or: [{ hostSocketId: socket.id }, { "players.socketId": socket.id }]
+            });
 
-        if (room) {
-            // CASE A: HOST LEFT
-            if (room.hostSocketId === socket.id) {
-                // Delete room from DB
-                await Room.deleteOne({ _id: room._id });
+            if (room) {
+                // CASE A: HOST LEFT (and didn't reconnect)
+                if (room.hostSocketId === socket.id) {
+                    await Room.deleteOne({ _id: room._id });
+                    io.to(room.roomId).emit('room_destroyed', 'Host ended the session.');
+                    const sockets = await io.in(room.roomId).fetchSockets();
+                    sockets.forEach(s => s.disconnect(true));
+                }
+                // CASE B: PLAYER LEFT (and didn't reconnect)
+                else {
+                    room.players = room.players.filter(p => p.socketId !== socket.id);
+                    await room.save();
+                    // Update Host's list
+                    io.to(room.hostSocketId).emit('update_player_list', room.players);
+                }
+            }
+        }, 5000); // 5000ms = 5 seconds grace period
+    });
 
-                // Kick everyone out
-                io.to(room.roomId).emit('room_destroyed', 'Host ended the session.');
-
-                // Force disconnect all sockets in this room
-                const sockets = await io.in(room.roomId).fetchSockets();
-                sockets.forEach(s => s.disconnect(true));
+    // --- REJOIN ROOM (After Refresh) ---
+    socket.on("rejoin_room", async ({ roomId, player }) => {
+        try {
+            // 1. Find the existing room
+            const room = await Room.findOne({ roomId });
+            if (!room) {
+                return socket.emit('error', 'Room not found. It may have been closed.');
             }
 
-            // CASE B: PLAYER LEFT
-            else {
-                // Remove player from array
-                room.players = room.players.filter(p => p.socketId !== socket.id);
+            // 2. Find the specific player (fallback to matching by name if _id is missing)
+            const existingPlayer = room.players.find(p => 
+                (player._id && p._id.toString() === player._id) || p.name === player.name
+            );
+
+            if (existingPlayer) {
+                // 3. Update the DB with their brand new Socket ID
+                existingPlayer.socketId = socket.id;
+                
+                if (existingPlayer.isHost) {
+                    room.hostSocketId = socket.id;
+                }
+
                 await room.save();
 
-                // Update Host's list
-                io.to(room.hostSocketId).emit('player_left', { socketId: socket.id });
+                // 4. Re-add them to the Socket.io room channel
+                socket.join(roomId);
+
+                // 5. Fire events to sync their local state
+                socket.emit("room_joined", { 
+                    roomId, 
+                    player: existingPlayer, 
+                    playersList: room.players 
+                });
+
+                // Update everyone else's sidebar
+                io.to(roomId).emit("update_player_list", room.players);
+
+                // 6. Restore Game State if a game was active
+                if (room.status === 'playing') {
+                    socket.emit('game_started', { status: 'playing' });
+                    
+                    // Sync up the current rolled numbers
+                    if (room.currentNumber) {
+                        socket.emit('number_rolled', {
+                            number: room.currentNumber,
+                            history: room.numbersDrawn
+                        });
+                    }
+                } else if (room.status === 'ended') {
+                    socket.emit('game_over', { winner: room.winner || "Someone" });
+                }
+
+                console.log(`[Rejoin] ${existingPlayer.name} reconnected to ${roomId}`);
+            } else {
+                socket.emit('error', 'Player session not found in this room.');
             }
+
+        } catch (err) {
+            console.error('Rejoin error:', err);
+            socket.emit('error', 'Could not rejoin room');
         }
     });
 
