@@ -62,6 +62,11 @@ const PlayerRoom = () => {
 
     const onActionError = (msg) => toast.error(msg);
 
+    const onRoomDestroyed = (message) => {
+      toast.success(message);
+      navigate('/');
+    }
+
     // Attach listeners
     socket.on("game_started", onGameStarted);
     socket.on("number_rolled", onNumberRolled);
@@ -69,6 +74,8 @@ const PlayerRoom = () => {
     socket.on("game_over", onGameOver);
     socket.on("card_shuffled", onCardShuffled);
     socket.on("action_error", onActionError);
+    socket.on("room_destroyed", onRoomDestroyed);
+
 
     // Cleanup
     return () => {
@@ -78,6 +85,8 @@ const PlayerRoom = () => {
       socket.off("game_over", onGameOver);
       socket.off("card_shuffled", onCardShuffled);
       socket.off("action_error", onActionError);
+      socket.off("room_destroyed", onRoomDestroyed);
+
     };
   }, [socket, player]);
 

@@ -80,6 +80,25 @@ const HostRoom = () => {
     };
   }, [socket]);
 
+  // --- KEYBOARD LISTENERS ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        
+        if (gameState === "playing" && !isRolling) {
+          handleRoll();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [gameState, isRolling, room]);
+
   // --- ACTIONS ---
 
   const handleCopyCode = () => {

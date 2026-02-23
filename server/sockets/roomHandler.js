@@ -96,15 +96,39 @@ module.exports = (io, socket) => {
     });
 
     // --- EXPLICIT LEAVE ROOM (Instant departure) ---
-   socket.on('leave_room', async ({ roomId }) => {
+    socket.on('leave_room', async ({ roomId }) => {
         try {
-            const updatedRoom = await Room.findOneAndUpdate( /* ... */ );
+            const room = await Room.findOne({ roomId });
+            if (!room) return;
+
+            // 1. CHECK IF THE LEAVING PLAYER IS THE HOST
+            if (room.hostSocketId === socket.id) {
+                // Announce to all players that the host left
+                io.to(roomId).emit('room_destroyed', 'The host has left the game. The room is now closed.');
+                
+                // Delete the room from the database
+                await Room.deleteOne({ _id: room._id });
+                
+                // Kick all players from the socket room
+                const sockets = await io.in(roomId).fetchSockets();
+                sockets.forEach(s => {
+                    s.leave(roomId);
+                });
+                return; // Stop execution here for the host
+            }
+
+            // 2. IF NOT THE HOST, remove the normal player from the room
+            const updatedRoom = await Room.findOneAndUpdate(
+                { roomId: roomId },
+                { $pull: { players: { socketId: socket.id } } }, // Removes the specific player
+                { new: true }
+            );
 
             if (updatedRoom) {
                 io.to(updatedRoom.roomId).emit('update_player_list', updatedRoom.players);
                 io.to(updatedRoom.hostSocketId).emit('player_left', 'A player has left the game.');
 
-                // FIX: Repopulate progress for remaining players so they don't turn to "Ready"
+                // Repopulate progress for remaining players so they don't turn to "Ready"
                 if (updatedRoom.status === 'playing') {
                     updatedRoom.players.forEach(p => {
                         if (!p.isHost) {
@@ -117,6 +141,8 @@ module.exports = (io, socket) => {
                     });
                 }
             }
+            
+            // Remove this individual user from the Socket channel
             socket.leave(roomId);
         } catch (err) {
             console.error('Leave room error:', err);
@@ -131,9 +157,13 @@ module.exports = (io, socket) => {
                 const hostRoom = await Room.findOne({ hostSocketId: socket.id });
                 if (hostRoom) {
                     await Room.deleteOne({ _id: hostRoom._id });
-                    io.to(hostRoom.roomId).emit('room_destroyed', 'Host ended the session.');
+                    
+                    // Announce to players
+                    io.to(hostRoom.roomId).emit('room_destroyed', 'The host has disconnected. The room is now closed.');
+                    
+                    // Kick everyone out of the room
                     const sockets = await io.in(hostRoom.roomId).fetchSockets();
-                    sockets.forEach(s => s.disconnect(true));
+                    sockets.forEach(s => s.leave(hostRoom.roomId));
                     return;
                 }
 
@@ -152,7 +182,7 @@ module.exports = (io, socket) => {
             } catch (err) {
                 console.error("Disconnect cleanup error:", err);
             }
-        }, 5000); // 5000ms = 5 seconds
+        }, 3000); // 5000ms = 5 seconds
     });
 
     // --- REJOIN ROOM (After Refresh) ---
@@ -305,21 +335,29 @@ module.exports = (io, socket) => {
 
         // Mark it if not already marked
         if (!player.markedIndices.includes(cellIndex)) {
-            player.markedIndices.push(cellIndex);
+            
+            // FIX: Use atomic findOneAndUpdate instead of room.save() to prevent VersionErrors
+            const updatedRoom = await Room.findOneAndUpdate(
+                { roomId: roomId, 'players.socketId': socket.id },
+                { $addToSet: { 'players.$.markedIndices': cellIndex } }, // $addToSet safely pushes to the array
+                { new: true } // Returns the document AFTER the update is applied
+            );
 
-            // CALCULATE "BEST REMAINING" FOR HOST UI
-            const remaining = calculateRemaining(player.markedIndices, room.winningPattern);
+            if (updatedRoom) {
+                // Find the updated player to get their newly saved markedIndices
+                const updatedPlayer = updatedRoom.players.find(p => p.socketId === socket.id);
+                
+                // CALCULATE "BEST REMAINING" FOR HOST UI
+                const remaining = calculateRemaining(updatedPlayer.markedIndices, updatedRoom.winningPattern);
 
-            // Save & Notify Host
-            await room.save();
+                // Only send this update to the Host (to save bandwidth)
+                io.to(updatedRoom.hostSocketId).emit('update_player_progress', {
+                    playerId: updatedPlayer._id, // or socketId
+                    remaining: remaining
+                });
 
-            // Only send this update to the Host (to save bandwidth)
-            io.to(room.hostSocketId).emit('update_player_progress', {
-                playerId: player._id, // or socketId
-                remaining: remaining
-            });
-
-            socket.emit('mark_success', { cellIndex });
+                socket.emit('mark_success', { cellIndex });
+            }
         }
     });
 
