@@ -161,7 +161,6 @@ module.exports = (io, socket) => {
                 // Update everyone else's sidebar
                 io.to(roomId).emit("update_player_list", room.players);
 
-                // 6. Restore Game State if a game was active
                 if (room.status === 'playing') {
                     socket.emit('game_started', { status: 'playing' });
                     
@@ -172,6 +171,23 @@ module.exports = (io, socket) => {
                             history: room.numbersDrawn
                         });
                     }
+
+                    // --- NEW FIX: Restore Player Progress for the Host ---
+                    // If the user rejoining is the Host, recalculate and send 
+                    // the progress for every player so their UI updates.
+                    if (existingPlayer.isHost) {
+                        room.players.forEach(p => {
+                            if (!p.isHost) {
+                                const remaining = calculateRemaining(p.markedIndices, room.winningPattern);
+                                socket.emit('update_player_progress', {
+                                    playerId: p._id,
+                                    remaining: remaining
+                                });
+                            }
+                        });
+                    }
+                    // -----------------------------------------------------
+
                 } else if (room.status === 'ended') {
                     socket.emit('game_over', { winner: room.winner || "Someone" });
                 }
@@ -278,14 +294,27 @@ module.exports = (io, socket) => {
 
     // SHUFFLE CARD (Waiting Room Only)
     socket.on('request_shuffle', async ({ roomId }) => {
-        const room = await Room.findOne({ roomId });
-        if (!room || room.status !== 'waiting') return;
+        try {
+            const newMatrix = generateBingoCard();
 
-        const player = room.players.find(p => p.socketId === socket.id);
-        if (player) {
-            player.cardMatrix = generateBingoCard();
-            await room.save();
-            socket.emit('card_shuffled', player.cardMatrix);
+            const updatedRoom = await Room.findOneAndUpdate(
+                { 
+                    roomId: roomId, 
+                    status: 'waiting',
+                    'players.socketId': socket.id 
+                },
+                { 
+                    $set: { 'players.$.cardMatrix': newMatrix } 
+                },
+                { new: true }
+            );
+
+            if (updatedRoom) {
+                socket.emit('card_shuffled', newMatrix);
+            }
+        } catch (err) {
+            console.error('Shuffle error:', err);
+            socket.emit('error', 'Could not shuffle card');
         }
     });
 

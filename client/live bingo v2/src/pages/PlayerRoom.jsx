@@ -118,8 +118,8 @@ const PlayerRoom = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 pb-12">
-      {/* TOP BAR */}
-      <div className="w-full max-w-md flex justify-between items-center mb-6 bg-gray-800 p-3 rounded-xl border border-gray-700">
+      {/* TOP BAR - Increased max-width to match the new 2-column layout */}
+      <div className="w-full max-w-5xl flex justify-between items-center mb-6 bg-gray-800 p-3 rounded-xl border border-gray-700">
         <div>
           <h2 className="font-bold text-lg">{player?.name || "Player"}</h2>
           <p className="text-xs text-gray-400 font-mono">ROOM: {room}</p>
@@ -133,7 +133,7 @@ const PlayerRoom = () => {
       </div>
 
       {/* HERO SECTION */}
-      <div className="mb-6 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500">
+      <div className="mb-8 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500">
         <div className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-1">
           {gameState === "waiting" ? "Waiting for Host..." : "Current Number"}
         </div>
@@ -151,62 +151,70 @@ const PlayerRoom = () => {
         </div>
       </div>
 
-      {/* BINGO CARD */}
-      <BingoCard
-        matrix={cardMatrix}
-        markedIndices={markedIndices}
-        onCellClick={handleCellClick}
-        isSpectator={player?.isSpectator}
-      />
+      {/* 2-COLUMN LAYOUT WRAPPER */}
+      <div className="w-full max-w-5xl flex flex-col lg:flex-row items-start justify-center gap-8">
+        
+        {/* LEFT COLUMN: BINGO CARD & ACTION BUTTONS */}
+        <div className="flex flex-col items-center w-full lg:w-1/2">
+          {/* BINGO CARD */}
+          <BingoCard
+            matrix={cardMatrix}
+            markedIndices={markedIndices}
+            onCellClick={handleCellClick}
+            isSpectator={player?.isSpectator}
+          />
 
-      {/* ACTION BUTTONS */}
-      <div className="mt-8 w-full max-w-md flex gap-4">
-        {gameState === "waiting" && !player?.isSpectator && (
-          <button
-            onClick={handleShuffle}
-            className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold flex items-center justify-center gap-2"
-          >
-            <RefreshCw size={18} /> Shuffle Card
-          </button>
-        )}
+          {/* ACTION BUTTONS */}
+          <div className="mt-8 w-full max-w-md flex gap-4">
+            {gameState === "waiting" && !player?.isSpectator && (
+              <button
+                onClick={handleShuffle}
+                className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold flex items-center justify-center gap-2"
+              >
+                <RefreshCw size={18} /> Shuffle Card
+              </button>
+            )}
 
-        {gameState === "playing" && !player?.isSpectator && (
-          <button
-            onClick={handleClaimBingo}
-            className="flex-1 py-4 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black text-2xl shadow-lg hover:scale-105 transition-transform flex items-center justify-center gap-2 animate-pulse"
-          >
-            <Trophy size={28} /> BINGO!
-          </button>
-        )}
-      </div>
-
-      {/* CALL HISTORY */}
-      <div className="mt-8 w-full max-w-md bg-gray-800 p-4 rounded-xl">
-        <h3 className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-wide border-b border-gray-700 pb-2">
-          Call History
-        </h3>
-        <div className="flex flex-col gap-3">
-          {["B", "I", "N", "G", "O"].map((letter) => (
-            <div key={letter} className="flex items-start gap-4">
-              <span className="w-8 h-8 flex items-center justify-center font-black text-xl text-pink-500 drop-shadow-sm">
-                {letter}
-              </span>
-              <div className="flex flex-wrap gap-2 flex-1">
-                {groupedHistory[letter].map((num) => (
-                  <span
-                    key={num}
-                    className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full text-sm font-bold border border-gray-600 shadow-sm"
-                  >
-                    {num}
-                  </span>
-                ))}
-                {groupedHistory[letter].length === 0 && (
-                  <span className="text-gray-500 text-sm italic py-1">--</span>
-                )}
-              </div>
-            </div>
-          ))}
+            {gameState === "playing" && !player?.isSpectator && (
+              <button
+                onClick={handleClaimBingo}
+                className="flex-1 py-4 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black text-2xl shadow-lg hover:scale-105 transition-transform flex items-center justify-center gap-2 animate-pulse"
+              >
+                <Trophy size={28} /> BINGO!
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* RIGHT COLUMN: CALL HISTORY */}
+        <div className="w-full  lg:w-1/2 max-w-md mx-auto lg:max-w-none bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl">
+          <h3 className="text-sm text-gray-400 font-bold mb-6 uppercase tracking-wider border-b border-gray-700 pb-3">
+            Call History
+          </h3>
+          <div className="flex flex-col gap-4">
+            {["B", "I", "N", "G", "O"].map((letter) => (
+              <div key={letter} className="flex items-start gap-4">
+                <span className="w-10 h-10 flex items-center justify-center font-black text-2xl text-pink-500 drop-shadow-sm bg-gray-900 rounded-lg border border-gray-700">
+                  {letter}
+                </span>
+                <div className="flex flex-wrap gap-2 flex-1 pt-1">
+                  {groupedHistory[letter].map((num) => (
+                    <span
+                      key={num}
+                      className="w-9 h-9 flex items-center justify-center bg-gray-700 rounded-full text-sm font-bold border border-gray-600 shadow-sm"
+                    >
+                      {num}
+                    </span>
+                  ))}
+                  {groupedHistory[letter].length === 0 && (
+                    <span className="text-gray-500 text-sm italic py-1 mt-1">--</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   );

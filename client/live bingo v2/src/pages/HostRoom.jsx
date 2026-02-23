@@ -189,7 +189,7 @@ const HostRoom = () => {
           {/* THE BIG BALL (Current Number) */}
           <div
             className={`
-            w-48 h-48 rounded-full flex flex-col items-center justify-center 
+            w-48 h-48 rounded-full flex flex-col items-center justify-center  gap-2
             bg-gradient-to-br from-blue-600 to-purple-700 shadow-[0_0_30px_rgba(59,130,246,0.5)]
             border-4 border-white transition-all duration-300 transform
             ${isRolling ? "animate-bounce scale-110" : "scale-100"}
@@ -197,7 +197,7 @@ const HostRoom = () => {
           >
             {/* Show BINGO Letter on top of the number when not rolling */}
             {currentNumber && !isRolling && (
-              <span className="text-4xl font-black text-white/50 -mb-4 drop-shadow-md">
+              <span className="text-6xl font-black text-white/50 -mb-4 drop-shadow-md">
                 {getBingoLetter(currentNumber)}
               </span>
             )}
