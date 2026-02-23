@@ -14,6 +14,7 @@ const LandingPage = () => {
     username: "",
     roomCode: "",
     winningPattern: [],
+    numberOfCards: 1, // Default to 1 card
   });
 
   // --- SOCKET EVENT LISTENERS ---
@@ -65,12 +66,15 @@ const LandingPage = () => {
     if (!formData.username) return toast.error("Name is required");
     if (formData.winningPattern.length === 0)
       return toast.error("Select at least 1 winning cell");
+    if (formData.numberOfCards < 1 || formData.numberOfCards > 6)
+      return toast.error("Please select between 1 and 6 cards");
 
     // Connect & Emit
     if (!socket.connected) socket.connect();
     socket.emit("create_room", {
       hostName: formData.username,
       winningPattern: formData.winningPattern,
+      numberOfCards: parseInt(formData.numberOfCards, 10), // Send the selected card count to the server
     });
   };
 
@@ -132,6 +136,23 @@ const LandingPage = () => {
                 placeholder="Enter your name"
                 onChange={(e) =>
                   setFormData({ ...formData, username: e.target.value })
+                }
+              />
+            </div>
+
+            {/* Added: Number of Cards Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Cards per Player (1-6)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="6"
+                className="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none"
+                value={formData.numberOfCards}
+                onChange={(e) =>
+                  setFormData({ ...formData, numberOfCards: e.target.value })
                 }
               />
             </div>
