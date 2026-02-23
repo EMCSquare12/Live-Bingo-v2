@@ -33,6 +33,12 @@ const HostRoom = () => {
   useEffect(() => {
     if (!socket) return;
 
+    const onPlayerLeft = (msg) => {
+      toast(msg, { icon: "👋" });
+    };
+
+    socket.on("player_left", onPlayerLeft);
+
     socket.on("update_player_list", (updatedPlayers) => {
       setPlayers(updatedPlayers.filter((p) => !p.isHost));
     });
@@ -65,6 +71,7 @@ const HostRoom = () => {
     });
 
     return () => {
+      socket.off("player_left", onPlayerLeft);
       socket.off("update_player_list");
       socket.off("game_started");
       socket.off("number_rolled");

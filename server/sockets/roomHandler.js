@@ -95,33 +95,64 @@ module.exports = (io, socket) => {
         }
     });
 
-    // DISCONNECT
-    socket.on('disconnect', async () => {
-        // Delay the cleanup by 5 seconds to allow page reloads to reconnect
-        setTimeout(async () => {
-            // Check if this specific socket ID is STILL recorded in the database
-            // If the user reconnected via rejoin_room, their socketId in the DB would have updated to a new one!
-            const room = await Room.findOne({
-                $or: [{ hostSocketId: socket.id }, { "players.socketId": socket.id }]
-            });
+    // --- EXPLICIT LEAVE ROOM (Instant departure) ---
+   socket.on('leave_room', async ({ roomId }) => {
+        try {
+            const updatedRoom = await Room.findOneAndUpdate( /* ... */ );
 
-            if (room) {
-                // CASE A: HOST LEFT (and didn't reconnect)
-                if (room.hostSocketId === socket.id) {
-                    await Room.deleteOne({ _id: room._id });
-                    io.to(room.roomId).emit('room_destroyed', 'Host ended the session.');
-                    const sockets = await io.in(room.roomId).fetchSockets();
-                    sockets.forEach(s => s.disconnect(true));
-                }
-                // CASE B: PLAYER LEFT (and didn't reconnect)
-                else {
-                    room.players = room.players.filter(p => p.socketId !== socket.id);
-                    await room.save();
-                    // Update Host's list
-                    io.to(room.hostSocketId).emit('update_player_list', room.players);
+            if (updatedRoom) {
+                io.to(updatedRoom.roomId).emit('update_player_list', updatedRoom.players);
+                io.to(updatedRoom.hostSocketId).emit('player_left', 'A player has left the game.');
+
+                // FIX: Repopulate progress for remaining players so they don't turn to "Ready"
+                if (updatedRoom.status === 'playing') {
+                    updatedRoom.players.forEach(p => {
+                        if (!p.isHost) {
+                            const remaining = calculateRemaining(p.markedIndices, updatedRoom.winningPattern);
+                            io.to(updatedRoom.hostSocketId).emit('update_player_progress', {
+                                playerId: p._id,
+                                remaining: remaining
+                            });
+                        }
+                    });
                 }
             }
-        }, 5000); // 5000ms = 5 seconds grace period
+            socket.leave(roomId);
+        } catch (err) {
+            console.error('Leave room error:', err);
+        }
+    });
+
+    // --- DISCONNECT (5-second grace period for drops/refreshes) ---
+    socket.on('disconnect', async () => {
+        setTimeout(async () => {
+            try {
+                // 1. Check if the socket was a HOST
+                const hostRoom = await Room.findOne({ hostSocketId: socket.id });
+                if (hostRoom) {
+                    await Room.deleteOne({ _id: hostRoom._id });
+                    io.to(hostRoom.roomId).emit('room_destroyed', 'Host ended the session.');
+                    const sockets = await io.in(hostRoom.roomId).fetchSockets();
+                    sockets.forEach(s => s.disconnect(true));
+                    return;
+                }
+
+                // 2. If not host, attempt to atomically remove the player
+                const updatedRoom = await Room.findOneAndUpdate(
+                    { 'players.socketId': socket.id },
+                    { $pull: { players: { socketId: socket.id } } },
+                    { new: true }
+                );
+
+                // 3. If a player was successfully removed (meaning they didn't reconnect)
+                if (updatedRoom) {
+                    io.to(updatedRoom.roomId).emit('update_player_list', updatedRoom.players);
+                    io.to(updatedRoom.hostSocketId).emit('player_left', 'A player disconnected.');
+                }
+            } catch (err) {
+                console.error("Disconnect cleanup error:", err);
+            }
+        }, 5000); // 5000ms = 5 seconds
     });
 
     // --- REJOIN ROOM (After Refresh) ---
@@ -161,6 +192,7 @@ module.exports = (io, socket) => {
                 // Update everyone else's sidebar
                 io.to(roomId).emit("update_player_list", room.players);
 
+                // 6. Restore Game State if a game was active
                 if (room.status === 'playing') {
                     socket.emit('game_started', { status: 'playing' });
                     
@@ -172,21 +204,20 @@ module.exports = (io, socket) => {
                         });
                     }
 
-                    // --- NEW FIX: Restore Player Progress for the Host ---
-                    // If the user rejoining is the Host, recalculate and send 
-                    // the progress for every player so their UI updates.
-                    if (existingPlayer.isHost) {
-                        room.players.forEach(p => {
-                            if (!p.isHost) {
-                                const remaining = calculateRemaining(p.markedIndices, room.winningPattern);
-                                socket.emit('update_player_progress', {
-                                    playerId: p._id,
-                                    remaining: remaining
-                                });
-                            }
-                        });
-                    }
-                    // -----------------------------------------------------
+                    // --- UPDATED FIX: Restore Player Progress for the Host ---
+                    // By looping through players and using io.to(room.hostSocketId),
+                    // we blast the correct progress to the Host regardless of WHO reloaded.
+                    // This instantly patches the "Ready" text back to "X to win".
+                    room.players.forEach(p => {
+                        if (!p.isHost) {
+                            const remaining = calculateRemaining(p.markedIndices, room.winningPattern);
+                            io.to(room.hostSocketId).emit('update_player_progress', {
+                                playerId: p._id,
+                                remaining: remaining
+                            });
+                        }
+                    });
+                    // ---------------------------------------------------------
 
                 } else if (room.status === 'ended') {
                     socket.emit('game_over', { winner: room.winner || "Someone" });

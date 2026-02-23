@@ -84,6 +84,7 @@ const PlayerRoom = () => {
   // --- HANDLERS ---
   const handleLeave = () => {
     if (confirm("Are you sure you want to leave?")) {
+      socket.emit("leave_room", { roomId: room });
       disconnectSocket();
     }
   };
