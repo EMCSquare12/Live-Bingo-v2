@@ -24,7 +24,6 @@ module.exports = (io, socket) => {
             const newRoom = new Room({
                 roomId,
                 winningPattern,
-                numberOfCards: numberOfCards || 1,
                 hostSocketId: socket.id,
                 players: [hostPlayer]
             });

@@ -25,7 +25,6 @@ const RoomSchema = new mongoose.Schema({
     numbersDrawn: { type: [Number], default: [] },
     currentNumber: { type: Number, default: null },
     winningPattern: { type: [Number], default: [] },
-    numberOfCards: { type: Number, default: 1 },
 
     players: [PlayerSchema],
 
