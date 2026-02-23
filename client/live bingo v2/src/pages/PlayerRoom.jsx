@@ -67,6 +67,20 @@ const PlayerRoom = () => {
       navigate('/');
     }
 
+    const onGameReset = ({ message, players }) => {
+      setGameState("waiting");
+      setLastCalledNumber(null);
+      setCalledHistory([]);
+      setMarkedIndices([12]);
+      
+      const me = players.find(p => p.socketId === socket.id || p.name === player?.name);
+      if (me && me.cardMatrix) {
+        setCardMatrix(me.cardMatrix);
+      }
+      
+      toast.success(message || "New Game! Your card has been shuffled.", { icon: "🔄" });
+    };
+
     // Attach listeners
     socket.on("game_started", onGameStarted);
     socket.on("number_rolled", onNumberRolled);
@@ -75,6 +89,7 @@ const PlayerRoom = () => {
     socket.on("card_shuffled", onCardShuffled);
     socket.on("action_error", onActionError);
     socket.on("room_destroyed", onRoomDestroyed);
+    socket.on("game_reset", onGameReset);
 
 
     // Cleanup
@@ -86,6 +101,7 @@ const PlayerRoom = () => {
       socket.off("card_shuffled", onCardShuffled);
       socket.off("action_error", onActionError);
       socket.off("room_destroyed", onRoomDestroyed);
+      socket.off("game_reset", onGameReset);
 
     };
   }, [socket, player]);

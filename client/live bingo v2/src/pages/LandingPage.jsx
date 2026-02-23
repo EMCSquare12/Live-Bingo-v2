@@ -19,15 +19,14 @@ const LandingPage = () => {
   // --- SOCKET EVENT LISTENERS ---
   useEffect(() => {
     if (!socket) return;
-    // Listen for successful Room Creation
+    
     socket.on("room_created", ({ roomId, player }) => {
       setRoom(roomId);
-      setPlayer(player); // Save to context
+      setPlayer(player);
       toast.success(`Room ${roomId} Created!`);
       navigate("/host");
     });
 
-    // Listen for successful Join
     socket.on("room_joined", ({ roomId, player }) => {
       setRoom(roomId);
       setPlayer(player);
@@ -35,15 +34,14 @@ const LandingPage = () => {
       navigate("/play");
     });
 
-    // Listen for Spectator Mode (Game already started)
+    // UPDATED: Navigate to /spectate and pass the initial state
     socket.on("spectator_joined", ({ gameState, message }) => {
       setRoom(gameState.roomId);
       setPlayer({ name: formData.username, isSpectator: true, isHost: false });
       toast(message, { icon: "👀" });
-      navigate("/play");
+      navigate("/spectate", { state: { gameState } });
     });
 
-    // Errors
     socket.on("error", (msg) => toast.error(msg));
 
     return () => {
@@ -66,7 +64,6 @@ const LandingPage = () => {
     if (formData.winningPattern.length === 0)
       return toast.error("Select at least 1 winning cell");
 
-    // Connect & Emit
     if (!socket.connected) socket.connect();
     socket.emit("create_room", {
       hostName: formData.username,
@@ -80,7 +77,6 @@ const LandingPage = () => {
     if (!formData.username || !formData.roomCode)
       return toast.error("Fill all fields");
 
-    // Connect & Emit
     if (!socket.connected) socket.connect();
     socket.emit("join_room", {
       roomId: formData.roomCode.toUpperCase(),
@@ -136,7 +132,6 @@ const LandingPage = () => {
               />
             </div>
 
-            {/* Pattern Picker */}
             <div className="bg-gray-900 p-3 rounded-lg border border-gray-700">
               <label className="block text-sm font-medium text-gray-300 mb-2 text-center">
                 Winning Pattern

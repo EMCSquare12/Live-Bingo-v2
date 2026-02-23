@@ -20,6 +20,16 @@ function App() {
           }
         />
 
+        {/* Protected Spectator Route (Uses HostRoom UI) */}
+        <Route
+          path="/spectate"
+          element={
+            <ProtectedRoute>
+              <HostRoom />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Protected Player Route */}
         <Route
           path="/play"
