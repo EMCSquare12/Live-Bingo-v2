@@ -42,7 +42,7 @@ const HostRoom = () => {
   const [isRolling, setIsRolling] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  // --- SOCKET LISTENERS ---
+  // SOCKET LISTENERS
   useEffect(() => {
     if (!socket) return;
 
@@ -70,11 +70,23 @@ const HostRoom = () => {
     });
 
     socket.on("number_rolled", ({ number, history: newHistory }) => {
-      setIsRolling(false);
-      setCurrentNumber(number);
-      setHistory(newHistory);
-    });
+      setIsRolling(true); // Start the animation
 
+      let i = 0;
+      const interval = setInterval(() => {
+        // Shuffle random numbers temporarily
+        setCurrentNumber(Math.floor(Math.random() * 75) + 1);
+        i++;
+        if (i > 10) {
+          // After ~1 second, stop shuffling and reveal the actual number
+          clearInterval(interval);
+          setIsRolling(false);
+          setCurrentNumber(number);
+          setHistory(newHistory);
+        }
+      }, 100);
+    });
+    
     socket.on("update_player_progress", ({ playerId, remaining }) => {
       setPlayers((prev) =>
         prev.map((p) =>
@@ -140,16 +152,7 @@ const HostRoom = () => {
   const handleRoll = () => {
     if (isRolling) return;
     setIsRolling(true);
-
-    let i = 0;
-    const interval = setInterval(() => {
-      setCurrentNumber(Math.floor(Math.random() * 75) + 1);
-      i++;
-      if (i > 10) {
-        clearInterval(interval);
-        socket.emit("roll_number", { roomId: room });
-      }
-    }, 100);
+    socket.emit("roll_number", { roomId: room });
   };
 
   const handleKick = (playerSocketId) => {
@@ -247,14 +250,23 @@ const HostRoom = () => {
 
         {/* SETTINGS MODAL */}
         {showSettings && !isSpectator && (
-          <div className="absolute top-24 right-8 z-50 bg-gray-800 p-4 border border-gray-600 rounded-xl shadow-2xl">
-            <h3 className="font-bold mb-2">Edit Pattern</h3>
-            <PatternPicker
-              onPatternChange={(p) => {
-                socket.emit("update_pattern", { roomId: room, pattern: p });
-              }}
+          <>
+            {/* Invisible clickable overlay to detect outside clicks */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowSettings(false)}
             />
-          </div>
+
+            {/* Actual Modal Container */}
+            <div className="absolute top-24 right-8 z-50 bg-gray-800 p-4 border border-gray-600 rounded-xl shadow-2xl">
+              <h3 className="font-bold mb-2">Edit Pattern</h3>
+              <PatternPicker
+                onPatternChange={(p) => {
+                  socket.emit("update_pattern", { roomId: room, pattern: p });
+                }}
+              />
+            </div>
+          </>
         )}
 
         {/* GAME AREA */}

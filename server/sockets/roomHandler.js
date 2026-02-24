@@ -436,12 +436,22 @@ module.exports = (io, socket) => {
 
   // UPDATE PATTERN (Before game starts)
   socket.on("update_pattern", async ({ roomId, pattern }) => {
-    const room = await Room.findOne({ roomId });
-    if (!room || room.hostSocketId !== socket.id) return;
-    if (room.status !== "waiting") return;
-
-    room.winningPattern = pattern;
-    await room.save();
+    try {
+      // Use findOneAndUpdate to atomically set the pattern and prevent VersionErrors
+      // The query conditions automatically ensure it's the host and the game is waiting
+      await Room.findOneAndUpdate(
+        {
+          roomId: roomId,
+          hostSocketId: socket.id,
+          status: "waiting",
+        },
+        {
+          $set: { winningPattern: pattern },
+        },
+      );
+    } catch (err) {
+      console.error("Update pattern error:", err);
+    }
   });
 
   // CLAIM BINGO

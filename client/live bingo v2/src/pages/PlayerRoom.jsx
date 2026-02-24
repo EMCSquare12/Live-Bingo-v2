@@ -20,6 +20,7 @@ const PlayerRoom = () => {
   const navigate = useNavigate();
 
   // Local Game State
+  const [isRolling, setIsRolling] = useState(false);
   const [gameState, setGameState] = useState("waiting");
   const [cardMatrix, setCardMatrix] = useState(player?.cardMatrix || []);
   const [markedIndices, setMarkedIndices] = useState(
@@ -38,8 +39,19 @@ const PlayerRoom = () => {
     };
 
     const onNumberRolled = ({ number, history }) => {
-      setLastCalledNumber(number);
-      setCalledHistory(history);
+      setIsRolling(true);
+
+      let i = 0;
+      const interval = setInterval(() => {
+        setLastCalledNumber(Math.floor(Math.random() * 75) + 1);
+        i++;
+        if (i > 10) {
+          clearInterval(interval);
+          setIsRolling(false);
+          setLastCalledNumber(number);
+          setCalledHistory(history);
+        }
+      }, 100);
     };
 
     const onMarkSuccess = ({ cellIndex }) => {
@@ -165,15 +177,21 @@ const PlayerRoom = () => {
         <div className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-1">
           {gameState === "waiting" ? "Waiting for Host..." : "Current Number"}
         </div>
+        {/* THE BIG BALL (Current Number) */}
         <div
-          className={`w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-white shadow-[0_0_20px_rgba(236,72,153,0.5)] bg-gradient-to-br from-pink-500 to-purple-600 ${lastCalledNumber ? "animate-bounce" : "opacity-50"}`}
+          className={`
+            w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2 mx-auto mb-8
+            bg-gradient-to-br from-blue-600 to-purple-700 shadow-[0_0_30px_rgba(59,130,246,0.5)]
+            border-4 border-white transition-all duration-300 transform
+            ${isRolling ? "animate-bounce scale-110" : "scale-100"}
+          `}
         >
-          {lastCalledNumber && (
-            <span className="text-xl font-black text-white/50 -mb-2">
+          {lastCalledNumber && !isRolling && (
+            <span className="text-6xl font-black text-white/50 -mb-4 drop-shadow-md">
               {getBingoLetter(lastCalledNumber)}
             </span>
           )}
-          <span className="text-5xl font-black z-10">
+          <span className="text-8xl font-black text-white drop-shadow-md z-10">
             {lastCalledNumber || "--"}
           </span>
         </div>
