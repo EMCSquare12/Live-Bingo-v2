@@ -36,6 +36,7 @@ const HostRoom = () => {
     location.state?.gameState?.players?.filter((p) => !p.isHost) || [],
   );
   const [winner, setWinner] = useState(null);
+  const [gameStarted, setGameStarted] = useState(false);
 
   // UI State
   const [isRolling, setIsRolling] = useState(false);
@@ -133,6 +134,7 @@ const HostRoom = () => {
   const handleStartGame = () => {
     if (players.length === 0) return toast.error("Wait for players to join!");
     socket.emit("start_game", { roomId: room });
+    setGameStarted(true);
   };
 
   const handleRoll = () => {
@@ -164,6 +166,7 @@ const HostRoom = () => {
     if (confirm("Restart Game? All progress will be lost.")) {
       socket.emit("restart_game", { roomId: room });
     }
+    setGameStarted(false);
   };
 
   const handleCloseRoom = () => {
@@ -224,12 +227,20 @@ const HostRoom = () => {
                 <LogOut size={18} /> Leave
               </button>
             ) : (
-              <button
-                onClick={handleCloseRoom}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 font-bold"
-              >
-                <XCircle size={18} /> End
-              </button>
+              <>
+                <button
+                  onClick={handleRestart}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2 font-bold"
+                >
+                  New Game
+                </button>
+                <button
+                  onClick={handleCloseRoom}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 font-bold"
+                >
+                  <XCircle size={18} /> End
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -348,6 +359,7 @@ const HostRoom = () => {
         players={players}
         onKick={isSpectator ? null : handleKick}
         winnerName={winner}
+        gameStarted={gameStarted}
       />
     </div>
   );

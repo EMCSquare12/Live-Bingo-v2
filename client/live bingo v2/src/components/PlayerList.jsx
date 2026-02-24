@@ -1,7 +1,7 @@
 import React from "react";
 import { Trash2, User, Trophy } from "lucide-react";
 
-const PlayerList = ({ players, onKick, winnerName }) => {
+const PlayerList = ({ players, onKick, winnerName, gameStarted }) => {
   return (
     <div className="bg-gray-800 w-full md:w-80 border-l border-gray-700 flex flex-col h-full">
       <div className="p-4 border-b border-gray-700 bg-gray-900">
@@ -34,9 +34,11 @@ const PlayerList = ({ players, onKick, winnerName }) => {
                   <Trophy size={16} className="text-yellow-400" />
                 )}
               </p>
-              {/* Show "To Go" count if available */}
+              {/* Show "To Go" count if available, default to 24 when game starts */}
               <p className="text-xs text-gray-400">
-                {p.remaining !== undefined ? `${p.remaining} to win` : "Ready"}
+                {gameStarted
+                  ? `${p.remaining !== undefined ? p.remaining : 24} to win`
+                  : "Ready"}
               </p>
             </div>
 

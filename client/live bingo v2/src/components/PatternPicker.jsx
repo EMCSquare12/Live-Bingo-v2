@@ -1,65 +1,93 @@
 import React, { useState, useEffect } from "react";
 
-const PatternPicker = ({ onPatternChange }) => {
-  // Default to Blackout (all indices 0-24)
-  const [selectedIndices, setSelectedIndices] = useState(
-    Array.from({ length: 25 }, (_, i) => i),
-  );
+const PATTERN_PRESETS = [
+  {
+    name: "Blackout",
+    color: "bg-blue-600 hover:bg-blue-500",
+    indices: Array.from({ length: 25 }, (_, i) => i),
+  },
+  {
+    name: "L Shape",
+    color: "bg-purple-600 hover:bg-purple-500",
+    indices: [0, 5, 10, 15, 20, 21, 22, 23, 24],
+  },
+  {
+    name: "I Shape",
+    color: "bg-purple-600 hover:bg-purple-500",
+    indices: [0, 1, 2, 3, 4, 7, 17, 20, 21, 22, 23, 24],
+  },
+  {
+    name: "V Shape",
+    color: "bg-purple-600 hover:bg-purple-500",
+    indices: [0, 4, 5, 9, 10, 14, 16, 18, 22],
+  },
+  {
+    name: "E Shape",
+    color: "bg-purple-600 hover:bg-purple-500",
+    indices: [0, 1, 2, 3, 4, 5, 10, 11, 13, 14, 15, 20, 21, 22, 23, 24],
+  },
+];
 
-  const toggleCell = (index) => {
-    if (selectedIndices.includes(index)) {
-      setSelectedIndices(selectedIndices.filter((i) => i !== index));
-    } else {
-      setSelectedIndices([...selectedIndices, index]);
-    }
-  };
+const PatternPicker = ({ onPatternChange }) => {
+  const [selectedIndices, setSelectedIndices] = useState(
+    PATTERN_PRESETS[0].indices,
+  );
 
   useEffect(() => {
     onPatternChange(selectedIndices);
   }, [selectedIndices, onPatternChange]);
 
+  const toggleCell = (index) => {
+    setSelectedIndices((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index],
+    );
+  };
+
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-4">
       <p className="text-sm text-gray-400">
         Click cells to set winning pattern (Green = Required)
       </p>
 
-      <div className="grid grid-cols-5 gap-1 mb-2">
-        {Array.from({ length: 25 }).map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => toggleCell(i)}
-            className={`w-8 h-8 rounded text-xs font-bold border 
-              ${
-                selectedIndices.includes(i)
+      {/* Bingo Grid */}
+      <div className="grid grid-cols-5 gap-1">
+        {Array.from({ length: 25 }).map((_, i) => {
+          const isSelected = selectedIndices.includes(i);
+          const isFreeSpace = i === 12;
+
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => toggleCell(i)}
+              className={`w-8 h-8 rounded text-xs font-bold border transition-colors ${
+                isSelected
                   ? "bg-green-500 border-green-600 text-white"
                   : "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
               }`}
-          >
-            {i === 12 ? "FREE" : ""}
-          </button>
-        ))}
+            >
+              {isFreeSpace ? "FREE" : ""}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Presets */}
-      <div className="flex gap-2 text-xs">
-        <button
-          type="button"
-          className="px-2 py-1 bg-blue-600 rounded hover:bg-blue-500"
-          onClick={() =>
-            setSelectedIndices(Array.from({ length: 25 }, (_, i) => i))
-          }
-        >
-          Blackout
-        </button>
-        <button
-          type="button"
-          className="px-2 py-1 bg-purple-600 rounded hover:bg-purple-500"
-          onClick={() => setSelectedIndices([0, 4, 12, 20, 24])}
-        >
-          X Shape
-        </button>
+      {/* Preset Buttons (2 Rows: 1 Col, then 4 Cols) */}
+      <div className="grid grid-cols-4 gap-2 text-xs w-full max-w-[200px]">
+        {PATTERN_PRESETS.map(({ name, color, indices }, index) => (
+          <button
+            key={name}
+            type="button"
+            className={`px-1 py-1.5 rounded text-white transition-colors truncate ${
+              index === 0 ? "col-span-4" : "col-span-1"
+            } ${color}`}
+            onClick={() => setSelectedIndices(indices)}
+            title={name} // Shows full name on hover if it gets truncated
+          >
+            {/* Shorten the names for the bottom row so they fit nicely */}
+            {index === 0 ? name : name.charAt(0)}
+          </button>
+        ))}
       </div>
     </div>
   );
