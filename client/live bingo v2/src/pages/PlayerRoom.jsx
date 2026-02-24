@@ -16,7 +16,8 @@ const getBingoLetter = (num) => {
 };
 
 const PlayerRoom = () => {
-  const { socket, room, player, disconnectSocket } = useSocket();
+  const { socket, room, player, disconnectSocket, setPlayer, setRoom } =
+    useSocket();
   const navigate = useNavigate();
 
   // Local Game State
@@ -76,9 +77,17 @@ const PlayerRoom = () => {
 
     const onRoomDestroyed = (message) => {
       toast.success(message);
+
+      // Clear local states
+      setRoom(null);
+      setPlayer(null);
+
+      // Clear session storage so it doesn't try to reconnect on reload
+      sessionStorage.removeItem("room");
+      sessionStorage.removeItem("player");
+
       navigate("/");
     };
-
     const onGameReset = ({ message, players }) => {
       setGameState("waiting");
       setLastCalledNumber(null);
@@ -124,7 +133,15 @@ const PlayerRoom = () => {
   const handleLeave = () => {
     if (confirm("Are you sure you want to leave?")) {
       socket.emit("leave_room", { roomId: room });
+
+      // Clear session data
+      setRoom(null);
+      setPlayer(null);
+      sessionStorage.removeItem("room");
+      sessionStorage.removeItem("player");
+
       disconnectSocket();
+      navigate("/"); // Navigate back to home manually
     }
   };
 
@@ -158,8 +175,8 @@ const PlayerRoom = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 pb-12">
-      {/* TOP BAR - Increased max-width to match the new 2-column layout */}
-      <div className="w-full max-w-5xl flex justify-between items-center mb-6 bg-gray-800 p-3 rounded-xl border border-gray-700">
+      {/* TOP BAR - Increased to max-w-6xl for the 3-column layout */}
+      <div className="w-full max-w-6xl flex justify-between items-center mb-6 bg-gray-800 p-3 rounded-xl border border-gray-700">
         <div>
           <h2 className="font-bold text-lg">{player?.name || "Player"}</h2>
           <p className="text-xs text-gray-400 font-mono">ROOM: {room}</p>
@@ -172,35 +189,35 @@ const PlayerRoom = () => {
         </button>
       </div>
 
-      {/* HERO SECTION */}
-      <div className="mb-8 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500">
-        <div className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-1">
-          {gameState === "waiting" ? "Waiting for Host..." : "Current Number"}
-        </div>
-        {/* THE BIG BALL (Current Number) */}
-        <div
-          className={`
-            w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2 mx-auto mb-8
-            bg-gradient-to-br from-blue-600 to-purple-700 shadow-[0_0_30px_rgba(59,130,246,0.5)]
-            border-4 border-white transition-all duration-300 transform
-            ${isRolling ? "animate-bounce scale-110" : "scale-100"}
-          `}
-        >
-          {lastCalledNumber && !isRolling && (
-            <span className="text-6xl font-black text-white/50 -mb-4 drop-shadow-md">
-              {getBingoLetter(lastCalledNumber)}
+      {/* 3-COLUMN LAYOUT WRAPPER */}
+      <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center mt-10 lg:items-start justify-center gap-8">
+        {/* LEFT COLUMN: THE BIG BALL (Order 1 on Mobile, 1 on Desktop) */}
+        <div className="flex  flex-col items-center w-full  lg:flex-1 order-1 lg:order-1 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-1">
+            {gameState === "waiting" ? "Waiting for Host..." : "Current Number"}
+          </div>
+          {/* THE BIG BALL (Current Number) */}
+          <div
+            className={`
+              w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2 mx-auto
+              bg-linear-to-br from-blue-600 to-purple-700 shadow-[0_0_30px_rgba(59,130,246,0.5)]
+              border-4 border-white transition-all duration-300 transform
+              ${isRolling ? "animate-bounce scale-110" : "scale-100"}
+            `}
+          >
+            {lastCalledNumber && !isRolling && (
+              <span className="text-6xl font-black text-white/50 -mb-4 drop-shadow-md">
+                {getBingoLetter(lastCalledNumber)}
+              </span>
+            )}
+            <span className="text-8xl font-black text-white drop-shadow-md z-10">
+              {lastCalledNumber || "--"}
             </span>
-          )}
-          <span className="text-8xl font-black text-white drop-shadow-md z-10">
-            {lastCalledNumber || "--"}
-          </span>
+          </div>
         </div>
-      </div>
 
-      {/* 2-COLUMN LAYOUT WRAPPER */}
-      <div className="w-full max-w-5xl flex flex-col lg:flex-row items-start justify-center gap-8">
-        {/* LEFT COLUMN: BINGO CARD & ACTION BUTTONS */}
-        <div className="flex flex-col items-center w-full lg:w-1/2">
+        {/* CENTER COLUMN: BINGO CARD & ACTION BUTTONS (Order 2 on Mobile, 2 on Desktop) */}
+        <div className="flex flex-col items-center w-full lg:flex-1 order-2 lg:order-2">
           {/* BINGO CARD */}
           <BingoCard
             matrix={cardMatrix}
@@ -231,8 +248,8 @@ const PlayerRoom = () => {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: CALL HISTORY */}
-        <div className="w-full  lg:w-1/2 max-w-md mx-auto lg:max-w-none bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl">
+        {/* RIGHT COLUMN: CALL HISTORY (Order 3 on both) */}
+        <div className="w-full max-w-md mx-auto lg:flex-1 lg:max-w-none bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl order-3">
           <h3 className="text-sm text-gray-400 font-bold mb-6 uppercase tracking-wider border-b border-gray-700 pb-3">
             Call History
           </h3>

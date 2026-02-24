@@ -86,7 +86,7 @@ const HostRoom = () => {
         }
       }, 100);
     });
-    
+
     socket.on("update_player_progress", ({ playerId, remaining }) => {
       setPlayers((prev) =>
         prev.map((p) =>
