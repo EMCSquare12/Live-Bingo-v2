@@ -19,7 +19,7 @@ const LandingPage = () => {
   // --- SOCKET EVENT LISTENERS ---
   useEffect(() => {
     if (!socket) return;
-    
+
     socket.on("room_created", ({ roomId, player }) => {
       setRoom(roomId);
       setPlayer(player);

@@ -64,21 +64,25 @@ const PlayerRoom = () => {
 
     const onRoomDestroyed = (message) => {
       toast.success(message);
-      navigate('/');
-    }
+      navigate("/");
+    };
 
     const onGameReset = ({ message, players }) => {
       setGameState("waiting");
       setLastCalledNumber(null);
       setCalledHistory([]);
       setMarkedIndices([12]);
-      
-      const me = players.find(p => p.socketId === socket.id || p.name === player?.name);
+
+      const me = players.find(
+        (p) => p.socketId === socket.id || p.name === player?.name,
+      );
       if (me && me.cardMatrix) {
         setCardMatrix(me.cardMatrix);
       }
-      
-      toast.success(message || "New Game! Your card has been shuffled.", { icon: "🔄" });
+
+      toast.success(message || "New Game! Your card has been shuffled.", {
+        icon: "🔄",
+      });
     };
 
     // Attach listeners
@@ -91,7 +95,6 @@ const PlayerRoom = () => {
     socket.on("room_destroyed", onRoomDestroyed);
     socket.on("game_reset", onGameReset);
 
-
     // Cleanup
     return () => {
       socket.off("game_started", onGameStarted);
@@ -102,7 +105,6 @@ const PlayerRoom = () => {
       socket.off("action_error", onActionError);
       socket.off("room_destroyed", onRoomDestroyed);
       socket.off("game_reset", onGameReset);
-
     };
   }, [socket, player]);
 
@@ -179,7 +181,6 @@ const PlayerRoom = () => {
 
       {/* 2-COLUMN LAYOUT WRAPPER */}
       <div className="w-full max-w-5xl flex flex-col lg:flex-row items-start justify-center gap-8">
-        
         {/* LEFT COLUMN: BINGO CARD & ACTION BUTTONS */}
         <div className="flex flex-col items-center w-full lg:w-1/2">
           {/* BINGO CARD */}
@@ -233,14 +234,15 @@ const PlayerRoom = () => {
                     </span>
                   ))}
                   {groupedHistory[letter].length === 0 && (
-                    <span className="text-gray-500 text-sm italic py-1 mt-1">--</span>
+                    <span className="text-gray-500 text-sm italic py-1 mt-1">
+                      --
+                    </span>
                   )}
                 </div>
               </div>
             ))}
           </div>
         </div>
-
       </div>
     </div>
   );

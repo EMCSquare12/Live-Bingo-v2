@@ -23,10 +23,18 @@ const HostRoom = () => {
   const isSpectator = player?.isSpectator;
 
   // Initialize Game State from location.state if passed (for spectators)
-  const [gameState, setGameState] = useState(location.state?.gameState?.status || "waiting");
-  const [currentNumber, setCurrentNumber] = useState(location.state?.gameState?.currentNumber || null);
-  const [history, setHistory] = useState(location.state?.gameState?.numbersDrawn || []);
-  const [players, setPlayers] = useState(location.state?.gameState?.players?.filter((p) => !p.isHost) || []);
+  const [gameState, setGameState] = useState(
+    location.state?.gameState?.status || "waiting",
+  );
+  const [currentNumber, setCurrentNumber] = useState(
+    location.state?.gameState?.currentNumber || null,
+  );
+  const [history, setHistory] = useState(
+    location.state?.gameState?.numbersDrawn || [],
+  );
+  const [players, setPlayers] = useState(
+    location.state?.gameState?.players?.filter((p) => !p.isHost) || [],
+  );
   const [winner, setWinner] = useState(null);
 
   // UI State
@@ -37,11 +45,11 @@ const HostRoom = () => {
   useEffect(() => {
     if (!socket) return;
 
-    const onPlayerLeft = (msg) => {
+    socket.on("player_left", (msg) => {
       toast(msg, { icon: "👋" });
-    };
+    });
 
-    const onGameReset = ({ message, players: updatedPlayers }) => {
+    socket.on("game_reset", ({ message, players: updatedPlayers }) => {
       setGameState("waiting");
       setHistory([]);
       setCurrentNumber(null);
@@ -49,10 +57,7 @@ const HostRoom = () => {
       setIsRolling(false);
       setPlayers(updatedPlayers.filter((p) => !p.isHost));
       toast.success(message || "Game reset successfully.");
-    };
-
-    socket.on("player_left", onPlayerLeft);
-    socket.on("game_reset", onGameReset);
+    });
 
     socket.on("update_player_list", (updatedPlayers) => {
       setPlayers(updatedPlayers.filter((p) => !p.isHost));
@@ -88,17 +93,17 @@ const HostRoom = () => {
     // If the host closes the room while spectating
     socket.on("room_destroyed", (message) => {
       toast.success(message);
-      navigate('/');
+      navigate("/");
     });
 
     return () => {
-      socket.off("player_left", onPlayerLeft);
+      socket.off("player_left");
       socket.off("update_player_list");
       socket.off("game_started");
       socket.off("number_rolled");
       socket.off("update_player_progress");
       socket.off("game_over");
-      socket.off("game_reset", onGameReset);
+      socket.off("game_reset");
       socket.off("room_destroyed");
     };
   }, [socket, navigate]);
@@ -183,7 +188,6 @@ const HostRoom = () => {
   return (
     <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-hidden">
       <div className="flex-1 flex flex-col p-4 md:p-8 relative overflow-y-auto">
-        
         {/* HEADER */}
         <div className="flex justify-between items-center mb-8 bg-gray-800 p-4 rounded-xl shadow-lg">
           <div>
@@ -211,21 +215,21 @@ const HostRoom = () => {
                 <Settings size={20} />
               </button>
             )}
-            
+
             {isSpectator ? (
-               <button
-                 onClick={handleLeaveAsSpectator}
-                 className="px-4 py-2 bg-red-900/50 hover:bg-red-900 rounded-lg flex items-center gap-2 font-bold"
-               >
-                 <LogOut size={18} /> Leave
-               </button>
+              <button
+                onClick={handleLeaveAsSpectator}
+                className="px-4 py-2 bg-red-900/50 hover:bg-red-900 rounded-lg flex items-center gap-2 font-bold"
+              >
+                <LogOut size={18} /> Leave
+              </button>
             ) : (
-               <button
-                 onClick={handleCloseRoom}
-                 className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 font-bold"
-               >
-                 <XCircle size={18} /> End
-               </button>
+              <button
+                onClick={handleCloseRoom}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 font-bold"
+              >
+                <XCircle size={18} /> End
+              </button>
             )}
           </div>
         </div>
@@ -328,7 +332,9 @@ const HostRoom = () => {
                     </span>
                   ))}
                   {groupedHistory[letter].length === 0 && (
-                    <span className="text-gray-500 text-sm italic py-1">--</span>
+                    <span className="text-gray-500 text-sm italic py-1">
+                      --
+                    </span>
                   )}
                 </div>
               </div>
@@ -338,10 +344,10 @@ const HostRoom = () => {
       </div>
 
       {/* SIDEBAR (Right) */}
-      <PlayerList 
-        players={players} 
-        onKick={isSpectator ? null : handleKick} 
-        winnerName={winner} 
+      <PlayerList
+        players={players}
+        onKick={isSpectator ? null : handleKick}
+        winnerName={winner}
       />
     </div>
   );

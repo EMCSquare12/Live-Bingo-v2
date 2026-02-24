@@ -32,7 +32,9 @@ const ProtectedRoute = ({ children, requireHost = false }) => {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center">
         <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-lg animate-pulse font-bold text-gray-300">Reconnecting...</p>
+        <p className="text-lg animate-pulse font-bold text-gray-300">
+          Reconnecting...
+        </p>
       </div>
     );
   }
