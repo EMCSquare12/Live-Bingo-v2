@@ -142,6 +142,14 @@ const PlayerRoom = () => {
       });
     };
 
+    const onRoomJoined = ({ player: updatedPlayer }) => {
+      if (updatedPlayer) {
+        if (updatedPlayer.cardMatrix) setCardMatrix(updatedPlayer.cardMatrix);
+        if (updatedPlayer.markedIndices)
+          setMarkedIndices(updatedPlayer.markedIndices);
+      }
+    };
+
     socket.on("session_expired", onSessionExpired);
     socket.on("game_started", onGameStarted);
     socket.on("number_rolled", onNumberRolled);
@@ -152,6 +160,7 @@ const PlayerRoom = () => {
     socket.on("action_error", onActionError);
     socket.on("room_destroyed", onRoomDestroyed);
     socket.on("game_reset", onGameReset);
+    socket.on("room_joined", onRoomJoined);
 
     return () => {
       socket.off("session_expired", onSessionExpired);
@@ -164,6 +173,7 @@ const PlayerRoom = () => {
       socket.off("action_error", onActionError);
       socket.off("room_destroyed", onRoomDestroyed);
       socket.off("game_reset", onGameReset);
+      socket.off("room_joined", onRoomJoined);
     };
   }, [socket, player]);
 

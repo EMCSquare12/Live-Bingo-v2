@@ -6,6 +6,21 @@ const {
   checkWin,
 } = require("../utils/bingoGame");
 
+const getPlayersWithRemaining = (room) => {
+  const roomObj = room.toObject ? room.toObject() : room;
+  if (roomObj.status === "playing") {
+    roomObj.players.forEach((p) => {
+      if (!p.isHost) {
+        p.remaining = calculateRemaining(
+          p.markedIndices,
+          roomObj.winningPattern,
+        );
+      }
+    });
+  }
+  return roomObj.players;
+};
+
 module.exports = (io, socket) => {
   // --- CREATE ROOM ---
   socket.on("create_room", async ({ hostName, winningPattern }) => {
@@ -50,13 +65,11 @@ module.exports = (io, socket) => {
         return socket.emit("error", "Room not found");
       }
 
-      // Check if Game Started (Spectator Mode logic)
       if (roomCheck.status === "playing") {
         socket.join(roomId);
 
         const gameState = roomCheck.toObject();
-
-        gameState.players.forEach((p) => {  
+        gameState.players.forEach((p) => {
           if (!p.isHost) {
             p.remaining = calculateRemaining(
               p.markedIndices,
@@ -72,7 +85,6 @@ module.exports = (io, socket) => {
         return;
       }
 
-      // Create Player
       const newPlayer = {
         socketId: socket.id,
         name: playerName,
@@ -99,10 +111,13 @@ module.exports = (io, socket) => {
       socket.emit("room_joined", {
         roomId,
         player: newPlayer,
-        playersList: updatedRoom.players,
+        playersList: getPlayersWithRemaining(updatedRoom),
       });
 
-      io.to(roomId).emit("update_player_list", updatedRoom.players);
+      io.to(roomId).emit(
+        "update_player_list",
+        getPlayersWithRemaining(updatedRoom),
+      );
     } catch (err) {
       console.error(err);
       socket.emit("error", "Could not join room");
@@ -136,7 +151,7 @@ module.exports = (io, socket) => {
       if (updatedRoom) {
         io.to(updatedRoom.roomId).emit(
           "update_player_list",
-          updatedRoom.players,
+          getPlayersWithRemaining(updatedRoom),
         );
         io.to(updatedRoom.hostSocketId).emit(
           "player_left",
@@ -150,7 +165,7 @@ module.exports = (io, socket) => {
                 p.markedIndices,
                 updatedRoom.winningPattern,
               );
-              io.to(updatedRoom.hostSocketId).emit("update_player_progress", {
+              io.to(roomId).emit("update_player_progress", {
                 playerId: p._id,
                 remaining: remaining,
               });
@@ -189,7 +204,7 @@ module.exports = (io, socket) => {
         if (updatedRoom) {
           io.to(updatedRoom.roomId).emit(
             "update_player_list",
-            updatedRoom.players,
+            getPlayersWithRemaining(updatedRoom),
           );
           io.to(updatedRoom.hostSocketId).emit(
             "player_left",
@@ -212,25 +227,36 @@ module.exports = (io, socket) => {
           "Room not found. It may have been closed.",
         );
 
+      const isSpectator = player?.isSpectator;
       const existingPlayer = room.players.find(
         (p) =>
           (player._id && p._id.toString() === player._id) ||
           p.name === player.name,
       );
 
-      if (existingPlayer) {
-        existingPlayer.socketId = socket.id;
-        if (existingPlayer.isHost) room.hostSocketId = socket.id;
+      if (existingPlayer || isSpectator) {
+        if (existingPlayer) {
+          existingPlayer.socketId = socket.id;
+          if (existingPlayer.isHost) room.hostSocketId = socket.id;
+          await room.save();
+        }
 
-        await room.save();
         socket.join(roomId);
 
-        socket.emit("room_joined", {
-          roomId,
-          player: existingPlayer,
-          playersList: room.players,
-        });
-        io.to(roomId).emit("update_player_list", room.players);
+        const playersWithRemaining = getPlayersWithRemaining(room);
+        const updatedPlayer = existingPlayer
+          ? playersWithRemaining.find((p) => p.socketId === socket.id)
+          : null;
+
+        if (existingPlayer) {
+          socket.emit("room_joined", {
+            roomId,
+            player: updatedPlayer,
+            playersList: playersWithRemaining,
+          });
+        }
+
+        io.to(roomId).emit("update_player_list", playersWithRemaining);
 
         if (room.status === "playing") {
           socket.emit("game_started", {
@@ -245,15 +271,11 @@ module.exports = (io, socket) => {
             });
           }
 
-          room.players.forEach((p) => {
+          playersWithRemaining.forEach((p) => {
             if (!p.isHost) {
-              const remaining = calculateRemaining(
-                p.markedIndices,
-                room.winningPattern,
-              );
-              io.to(room.hostSocketId).emit("update_player_progress", {
+              socket.emit("update_player_progress", {
                 playerId: p._id,
-                remaining: remaining,
+                remaining: p.remaining,
               });
             }
           });
@@ -289,6 +311,8 @@ module.exports = (io, socket) => {
         status: "playing",
         winners: room.winners || [],
       });
+      // Initializing the players stat targets explicitly
+      io.to(roomId).emit("update_player_list", getPlayersWithRemaining(room));
     } catch (err) {
       console.error(err);
     }
@@ -354,7 +378,7 @@ module.exports = (io, socket) => {
           updatedRoom.winningPattern,
         );
 
-        io.to(updatedRoom.hostSocketId).emit("update_player_progress", {
+        io.to(roomId).emit("update_player_progress", {
           playerId: updatedPlayer._id,
           remaining: remaining,
         });
@@ -388,15 +412,44 @@ module.exports = (io, socket) => {
     const room = await Room.findOne({ roomId });
     if (!room || room.hostSocketId !== socket.id) return;
 
+    // Remove the player
     room.players = room.players.filter((p) => p.socketId !== targetSocketId);
+
+    // Check remaining active players (excluding the host)
+    const activePlayers = room.players.filter((p) => !p.isHost);
+    let gameWasReset = false;
+
+    // If no players are left and the game was running, reset the game
+    if (activePlayers.length === 0 && room.status === "playing") {
+      room.status = "waiting";
+      room.numbersDrawn = [];
+      room.currentNumber = null;
+      room.winners = [];
+
+      room.players.forEach((p) => {
+        p.markedIndices = [12];
+      });
+
+      gameWasReset = true;
+    }
+
     await room.save();
 
-    io.to(roomId).emit("update_player_list", room.players);
-
+    // Disconnect the kicked socket
     const targetSocket = io.sockets.sockets.get(targetSocketId);
     if (targetSocket) {
       targetSocket.emit("room_destroyed", "You were kicked by the host.");
       targetSocket.disconnect(true);
+    }
+
+    // Broadcast the appropriate event
+    if (gameWasReset) {
+      io.to(roomId).emit("game_reset", {
+        message: "All players removed. Game reset to waiting state.",
+        players: getPlayersWithRemaining(room),
+      });
+    } else {
+      io.to(roomId).emit("update_player_list", getPlayersWithRemaining(room));
     }
   });
 
@@ -460,7 +513,7 @@ module.exports = (io, socket) => {
     await room.save();
     io.to(roomId).emit("game_reset", {
       message: "New Game Started!",
-      players: room.players,
+      players: getPlayersWithRemaining(room),
     });
   });
 };
