@@ -40,6 +40,7 @@ module.exports = (io, socket) => {
       socket.emit("error", "Could not create room");
     }
   });
+
   // --- JOIN ROOM ---
   socket.on("join_room", async ({ roomId, playerName }) => {
     try {
@@ -68,7 +69,6 @@ module.exports = (io, socket) => {
         markedIndices: [12],
       };
 
-      // Add to DB using findOneAndUpdate to prevent VersionErrors from concurrent rapid joins (e.g. spectators turning into players simultaneously)
       const updatedRoom = await Room.findOneAndUpdate(
         { roomId: roomId, status: { $ne: "playing" } },
         { $push: { players: newPlayer } },
@@ -82,17 +82,14 @@ module.exports = (io, socket) => {
         );
       }
 
-      // Join Socket Room
       socket.join(roomId);
 
-      // Tell the specific user they joined
       socket.emit("room_joined", {
         roomId,
         player: newPlayer,
         playersList: updatedRoom.players,
       });
 
-      // Notify everyone else in the room (to update their sidebar)
       io.to(roomId).emit("update_player_list", updatedRoom.players);
     } catch (err) {
       console.error(err);
@@ -100,7 +97,7 @@ module.exports = (io, socket) => {
     }
   });
 
-  // --- EXPLICIT LEAVE ROOM (Instant departure) ---
+  // --- EXPLICIT LEAVE ROOM ---
   socket.on("leave_room", async ({ roomId }) => {
     try {
       const room = await Room.findOne({ roomId });
@@ -155,7 +152,7 @@ module.exports = (io, socket) => {
     }
   });
 
-  // --- DISCONNECT (3-second grace period for drops/refreshes) ---
+  // --- DISCONNECT ---
   socket.on("disconnect", async () => {
     setTimeout(async () => {
       try {
@@ -193,7 +190,7 @@ module.exports = (io, socket) => {
     }, 3000);
   });
 
-  // --- REJOIN ROOM (After Refresh) ---
+  // --- REJOIN ROOM ---
   socket.on("rejoin_room", async ({ roomId, player }) => {
     try {
       const room = await Room.findOne({ roomId });
@@ -255,6 +252,7 @@ module.exports = (io, socket) => {
     }
   });
 
+  // --- START GAME ---
   socket.on("start_game", async ({ roomId }) => {
     try {
       const room = await Room.findOne({ roomId });
@@ -278,7 +276,7 @@ module.exports = (io, socket) => {
     }
   });
 
-  // HOST ROLLS NUMBER
+  // --- HOST ROLLS NUMBER ---
   socket.on("roll_number", async ({ roomId }) => {
     const room = await Room.findOne({ roomId });
     if (!room || room.hostSocketId !== socket.id) return;
@@ -304,7 +302,7 @@ module.exports = (io, socket) => {
     });
   });
 
-  // PLAYER MARKS CARD
+  // --- PLAYER MARKS CARD ---
   socket.on("mark_number", async ({ roomId, number, cellIndex }) => {
     const room = await Room.findOne({ roomId });
     if (!room) return;
@@ -348,7 +346,7 @@ module.exports = (io, socket) => {
     }
   });
 
-  // SHUFFLE CARD (Waiting Room Only)
+  // --- SHUFFLE CARD ---
   socket.on("request_shuffle", async ({ roomId }) => {
     try {
       const newMatrix = generateBingoCard();
@@ -367,7 +365,7 @@ module.exports = (io, socket) => {
     }
   });
 
-  // KICK PLAYER
+  // --- KICK PLAYER ---
   socket.on("kick_player", async ({ roomId, targetSocketId }) => {
     const room = await Room.findOne({ roomId });
     if (!room || room.hostSocketId !== socket.id) return;
@@ -384,7 +382,7 @@ module.exports = (io, socket) => {
     }
   });
 
-  // UPDATE PATTERN (Before game starts)
+  // --- UPDATE PATTERN ---
   socket.on("update_pattern", async ({ roomId, pattern }) => {
     try {
       await Room.findOneAndUpdate(
@@ -396,7 +394,7 @@ module.exports = (io, socket) => {
     }
   });
 
-  // CLAIM BINGO
+  // --- CLAIM BINGO ---
   socket.on("claim_bingo", async ({ roomId }) => {
     const room = await Room.findOne({ roomId });
     if (!room) return;
@@ -407,20 +405,26 @@ module.exports = (io, socket) => {
     const hasWon = checkWin(player.markedIndices, room.winningPattern);
 
     if (hasWon) {
-      if (!room.winners) room.winners = [];
-      room.winners.push(player.name);
-      await room.save();
+      // Safely register multiple winners without stopping the game
+      const updatedRoom = await Room.findOneAndUpdate(
+        { roomId: roomId, winners: { $ne: player.name } },
+        { $push: { winners: player.name } },
+        { new: true },
+      );
 
-      io.to(roomId).emit("player_won", {
-        winner: player.name,
-        winners: room.winners,
-      });
+      if (updatedRoom) {
+        io.to(roomId).emit("player_won", {
+          winner: player.name,
+          winners: updatedRoom.winners,
+          rank: updatedRoom.winners.length,
+        });
+      }
     } else {
       io.to(roomId).emit("false_bingo", { name: player.name });
     }
   });
 
-  // RESTART GAME (Host Only)
+  // --- RESTART GAME ---
   socket.on("restart_game", async ({ roomId }) => {
     const room = await Room.findOne({ roomId });
     if (!room || room.hostSocketId !== socket.id) return;

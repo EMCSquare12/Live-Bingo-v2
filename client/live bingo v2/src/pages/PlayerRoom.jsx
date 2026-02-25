@@ -65,14 +65,27 @@ const PlayerRoom = () => {
       setMarkedIndices((prev) => [...new Set([...prev, cellIndex])]);
     };
 
-    const onPlayerWon = ({ winner, winners: updatedWinners }) => {
+    const onPlayerWon = ({ winner, winners: updatedWinners, rank }) => {
       if (updatedWinners) setWinners(updatedWinners);
 
+      const suffix =
+        rank === 1 ? "st" : rank === 2 ? "nd" : rank === 3 ? "rd" : "th";
+
       if (winner === player?.name) {
-        toast.success("YOU WON! BINGO!!! 🏆", { duration: 5000 });
+        if (rank === 1) {
+          toast.success("YOU WON 1ST PLACE! BINGO!!! 🏆", { duration: 5000 });
+        } else {
+          toast.success(
+            `YOU GOT BINGO! You are in ${rank}${suffix} place! 🎉`,
+            { duration: 5000 },
+          );
+        }
         setHasWon(true);
       } else {
-        toast.success(`${winner} got BINGO! Game continues.`, { icon: "🎉" });
+        toast.success(
+          `${winner} got BINGO (${rank}${suffix} place)! Game continues.`,
+          { icon: "🎉" },
+        );
       }
     };
 

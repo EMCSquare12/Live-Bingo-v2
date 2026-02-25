@@ -16,14 +16,12 @@ const getBingoLetter = (num) => {
 };
 
 const HostRoom = () => {
-  // Grab `setPlayer` to update the user when they convert from spectator to player
   const { socket, room, player, disconnectSocket, setPlayer } = useSocket();
   const location = useLocation();
   const navigate = useNavigate();
 
   const isSpectator = player?.isSpectator;
 
-  // Initialize Game State from location.state if passed (for spectators)
   const [gameState, setGameState] = useState(
     location.state?.gameState?.status || "waiting",
   );
@@ -41,18 +39,15 @@ const HostRoom = () => {
   );
   const [gameStarted, setGameStarted] = useState(false);
 
-  // Sync LandingPage pattern into the host UI
   const initialPattern =
     location.state?.winningPattern ||
     location.state?.gameState?.winningPattern ||
     [];
   const [winningPattern, setWinningPattern] = useState(initialPattern);
 
-  // UI State
   const [isRolling, setIsRolling] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  // SOCKET LISTENERS
   useEffect(() => {
     if (!socket) return;
 
@@ -62,9 +57,8 @@ const HostRoom = () => {
 
     socket.on("game_reset", ({ message, players: updatedPlayers }) => {
       if (isSpectator) {
-        // Triggered auto-join: Convert Spectator to Player
         socket.emit("join_room", { roomId: room, playerName: player?.name });
-        return; // Spectator waits for 'room_joined' confirmation before resetting local state
+        return;
       }
 
       setGameState("waiting");
@@ -76,10 +70,9 @@ const HostRoom = () => {
       toast.success(message || "Game reset successfully.");
     });
 
-    // Triggers when Spectator successfully auto-rejoins as Player
     socket.on("room_joined", ({ roomId, player: newPlayer }) => {
       if (isSpectator) {
-        setPlayer(newPlayer); // Overwrites isSpectator: true, replacing it with the full DB Object
+        setPlayer(newPlayer);
         toast.success("Game reset! You joined as a player. 🎮");
         navigate("/play");
       }
@@ -121,9 +114,14 @@ const HostRoom = () => {
       );
     });
 
-    socket.on("player_won", ({ winner, winners: updatedWinners }) => {
+    socket.on("player_won", ({ winner, winners: updatedWinners, rank }) => {
       if (updatedWinners) setWinners(updatedWinners);
-      toast.success(`${winner} has BINGO!`, { duration: 5000, icon: "🏆" });
+      const suffix =
+        rank === 1 ? "st" : rank === 2 ? "nd" : rank === 3 ? "rd" : "th";
+      toast.success(`${winner} has BINGO! (${rank}${suffix} place)`, {
+        duration: 5000,
+        icon: rank === 1 ? "🏆" : "🏅",
+      });
     });
 
     socket.on("false_bingo", ({ name }) => {
@@ -149,7 +147,6 @@ const HostRoom = () => {
     };
   }, [socket, navigate, isSpectator, room, player?.name, setPlayer]);
 
-  // --- KEYBOARD LISTENERS ---
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Enter") {
@@ -164,7 +161,6 @@ const HostRoom = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [gameState, isRolling, room, isSpectator]);
 
-  // --- ACTIONS ---
   const handleCopyCode = () => {
     navigator.clipboard.writeText(room);
     toast.success("Room code copied!");
@@ -273,7 +269,6 @@ const HostRoom = () => {
           </div>
         </div>
 
-        {/* SETTINGS MODAL */}
         {showSettings && !isSpectator && (
           <>
             <div
@@ -293,7 +288,6 @@ const HostRoom = () => {
           </>
         )}
 
-        {/* GAME AREA */}
         <div className="flex-1 flex flex-col items-center justify-center gap-8 min-h-[400px]">
           <div
             className={`
@@ -348,7 +342,6 @@ const HostRoom = () => {
           )}
         </div>
 
-        {/* SEGREGATED HISTORY */}
         <div className="mt-8 bg-gray-800 p-4 rounded-xl w-full">
           <h3 className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-wide border-b border-gray-700 pb-2">
             Call History
@@ -381,7 +374,6 @@ const HostRoom = () => {
       </div>
 
       <PlayerList
-        winningPattern={winningPattern.length}
         players={players}
         onKick={isSpectator ? null : handleKick}
         winners={winners}
