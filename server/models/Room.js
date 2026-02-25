@@ -25,6 +25,7 @@ const RoomSchema = new mongoose.Schema({
   numbersDrawn: { type: [Number], default: [] },
   currentNumber: { type: Number, default: null },
   winningPattern: { type: [Number], default: [] },
+  winners: { type: [String], default: [] }, // Array to hold multiple winners
 
   players: [PlayerSchema],
 

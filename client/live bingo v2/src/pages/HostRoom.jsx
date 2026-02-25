@@ -16,7 +16,8 @@ const getBingoLetter = (num) => {
 };
 
 const HostRoom = () => {
-  const { socket, room, player, disconnectSocket } = useSocket();
+  // Grab `setPlayer` to update the user when they convert from spectator to player
+  const { socket, room, player, disconnectSocket, setPlayer } = useSocket();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -35,8 +36,17 @@ const HostRoom = () => {
   const [players, setPlayers] = useState(
     location.state?.gameState?.players?.filter((p) => !p.isHost) || [],
   );
-  const [winner, setWinner] = useState(null);
+  const [winners, setWinners] = useState(
+    location.state?.gameState?.winners || [],
+  );
   const [gameStarted, setGameStarted] = useState(false);
+
+  // Sync LandingPage pattern into the host UI
+  const initialPattern =
+    location.state?.winningPattern ||
+    location.state?.gameState?.winningPattern ||
+    [];
+  const [winningPattern, setWinningPattern] = useState(initialPattern);
 
   // UI State
   const [isRolling, setIsRolling] = useState(false);
@@ -51,34 +61,48 @@ const HostRoom = () => {
     });
 
     socket.on("game_reset", ({ message, players: updatedPlayers }) => {
+      if (isSpectator) {
+        // Triggered auto-join: Convert Spectator to Player
+        socket.emit("join_room", { roomId: room, playerName: player?.name });
+        return; // Spectator waits for 'room_joined' confirmation before resetting local state
+      }
+
       setGameState("waiting");
       setHistory([]);
       setCurrentNumber(null);
-      setWinner(null);
+      setWinners([]);
       setIsRolling(false);
       setPlayers(updatedPlayers.filter((p) => !p.isHost));
       toast.success(message || "Game reset successfully.");
+    });
+
+    // Triggers when Spectator successfully auto-rejoins as Player
+    socket.on("room_joined", ({ roomId, player: newPlayer }) => {
+      if (isSpectator) {
+        setPlayer(newPlayer); // Overwrites isSpectator: true, replacing it with the full DB Object
+        toast.success("Game reset! You joined as a player. 🎮");
+        navigate("/play");
+      }
     });
 
     socket.on("update_player_list", (updatedPlayers) => {
       setPlayers(updatedPlayers.filter((p) => !p.isHost));
     });
 
-    socket.on("game_started", () => {
+    socket.on("game_started", ({ winners: initialWinners }) => {
       setGameState("playing");
+      if (initialWinners) setWinners(initialWinners);
       toast.success("Game Started! Players' cards are locked.");
     });
 
     socket.on("number_rolled", ({ number, history: newHistory }) => {
-      setIsRolling(true); // Start the animation
+      setIsRolling(true);
 
       let i = 0;
       const interval = setInterval(() => {
-        // Shuffle random numbers temporarily
         setCurrentNumber(Math.floor(Math.random() * 75) + 1);
         i++;
         if (i > 10) {
-          // After ~1 second, stop shuffling and reveal the actual number
           clearInterval(interval);
           setIsRolling(false);
           setCurrentNumber(number);
@@ -97,13 +121,15 @@ const HostRoom = () => {
       );
     });
 
-    socket.on("game_over", ({ winner }) => {
-      setGameState("ended");
-      setWinner(winner);
+    socket.on("player_won", ({ winner, winners: updatedWinners }) => {
+      if (updatedWinners) setWinners(updatedWinners);
       toast.success(`${winner} has BINGO!`, { duration: 5000, icon: "🏆" });
     });
 
-    // If the host closes the room while spectating
+    socket.on("false_bingo", ({ name }) => {
+      toast(`${name} called a false BINGO! 🤡`, { icon: "🤡" });
+    });
+
     socket.on("room_destroyed", (message) => {
       toast.success(message);
       navigate("/");
@@ -115,18 +141,19 @@ const HostRoom = () => {
       socket.off("game_started");
       socket.off("number_rolled");
       socket.off("update_player_progress");
-      socket.off("game_over");
+      socket.off("player_won");
+      socket.off("false_bingo");
       socket.off("game_reset");
+      socket.off("room_joined");
       socket.off("room_destroyed");
     };
-  }, [socket, navigate]);
+  }, [socket, navigate, isSpectator, room, player?.name, setPlayer]);
 
   // --- KEYBOARD LISTENERS ---
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        // Prevent spectators from rolling with the keyboard
         if (gameState === "playing" && !isRolling && !isSpectator) {
           handleRoll();
         }
@@ -185,7 +212,6 @@ const HostRoom = () => {
     }
   };
 
-  // Group history by BINGO letter
   const groupedHistory = { B: [], I: [], N: [], G: [], O: [] };
   history.forEach((num) => {
     groupedHistory[getBingoLetter(num)].push(num);
@@ -194,7 +220,6 @@ const HostRoom = () => {
   return (
     <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-hidden">
       <div className="flex-1 flex flex-col p-4 md:p-8 relative overflow-y-auto">
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-8 bg-gray-800 p-4 rounded-xl shadow-lg">
           <div>
             <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500">
@@ -251,17 +276,16 @@ const HostRoom = () => {
         {/* SETTINGS MODAL */}
         {showSettings && !isSpectator && (
           <>
-            {/* Invisible clickable overlay to detect outside clicks */}
             <div
               className="fixed inset-0 z-40"
               onClick={() => setShowSettings(false)}
             />
-
-            {/* Actual Modal Container */}
             <div className="absolute top-24 right-8 z-50 bg-gray-800 p-4 border border-gray-600 rounded-xl shadow-2xl">
               <h3 className="font-bold mb-2">Edit Pattern</h3>
               <PatternPicker
+                initialPattern={winningPattern}
                 onPatternChange={(p) => {
+                  setWinningPattern(p);
                   socket.emit("update_pattern", { roomId: room, pattern: p });
                 }}
               />
@@ -271,7 +295,6 @@ const HostRoom = () => {
 
         {/* GAME AREA */}
         <div className="flex-1 flex flex-col items-center justify-center gap-8 min-h-[400px]">
-          {/* THE BIG BALL (Current Number) */}
           <div
             className={`
             w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2
@@ -290,7 +313,6 @@ const HostRoom = () => {
             </span>
           </div>
 
-          {/* CONTROLS (Hidden if Spectator) */}
           {!isSpectator && (
             <div className="flex gap-4">
               {gameState === "waiting" ? (
@@ -299,13 +321,6 @@ const HostRoom = () => {
                   className="px-8 py-4 bg-green-600 hover:bg-green-500 text-xl font-bold rounded-full shadow-lg flex items-center gap-2"
                 >
                   <Play fill="currentColor" /> Start Game
-                </button>
-              ) : gameState === "ended" ? (
-                <button
-                  onClick={handleRestart}
-                  className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-xl font-bold rounded-full shadow-lg flex items-center gap-2"
-                >
-                  <RotateCcw /> New Game
                 </button>
               ) : (
                 <button
@@ -326,7 +341,6 @@ const HostRoom = () => {
             </div>
           )}
 
-          {/* Spectator Status Text */}
           {isSpectator && gameState === "playing" && (
             <div className="text-xl font-bold text-gray-400 animate-pulse mt-4">
               Game in progress...
@@ -366,11 +380,11 @@ const HostRoom = () => {
         </div>
       </div>
 
-      {/* SIDEBAR (Right) */}
       <PlayerList
+        winningPattern={winningPattern.length}
         players={players}
         onKick={isSpectator ? null : handleKick}
-        winnerName={winner}
+        winners={winners}
         gameStarted={gameStarted}
       />
     </div>

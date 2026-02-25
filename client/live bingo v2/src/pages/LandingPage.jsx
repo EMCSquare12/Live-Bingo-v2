@@ -20,11 +20,12 @@ const LandingPage = () => {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("room_created", ({ roomId, player }) => {
+    socket.on("room_created", ({ roomId, player, room }) => {
       setRoom(roomId);
       setPlayer(player);
       toast.success(`Room ${roomId} Created!`);
-      navigate("/host");
+      // Pass the selected pattern downward
+      navigate("/host", { state: { winningPattern: room.winningPattern } });
     });
 
     socket.on("room_joined", ({ roomId, player }) => {
@@ -34,7 +35,6 @@ const LandingPage = () => {
       navigate("/play");
     });
 
-    // UPDATED: Navigate to /spectate and pass the initial state
     socket.on("spectator_joined", ({ gameState, message }) => {
       setRoom(gameState.roomId);
       setPlayer({ name: formData.username, isSpectator: true, isHost: false });

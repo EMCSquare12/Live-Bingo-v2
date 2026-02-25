@@ -28,9 +28,11 @@ const PATTERN_PRESETS = [
   },
 ];
 
-const PatternPicker = ({ onPatternChange }) => {
+const PatternPicker = ({ onPatternChange, initialPattern }) => {
   const [selectedIndices, setSelectedIndices] = useState(
-    PATTERN_PRESETS[0].indices,
+    initialPattern && initialPattern.length > 0
+      ? initialPattern
+      : PATTERN_PRESETS[0].indices,
   );
 
   useEffect(() => {

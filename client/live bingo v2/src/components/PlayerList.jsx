@@ -1,7 +1,7 @@
 import React from "react";
 import { Trash2, User, Trophy } from "lucide-react";
 
-const PlayerList = ({ players, onKick, winnerName, gameStarted }) => {
+const PlayerList = ({winningPattern, players, onKick, winners = [], gameStarted }) => {
   return (
     <div className="bg-gray-800 w-full md:w-80 border-l border-gray-700 flex flex-col h-full">
       <div className="p-4 border-b border-gray-700 bg-gray-900">
@@ -22,7 +22,7 @@ const PlayerList = ({ players, onKick, winnerName, gameStarted }) => {
           <div
             key={p.socketId || p.id}
             className={`flex items-center justify-between p-3 rounded-lg border ${
-              p.name === winnerName
+              winners.includes(p.name)
                 ? "bg-yellow-900/30 border-yellow-500"
                 : "bg-gray-700 border-gray-600"
             }`}
@@ -30,25 +30,29 @@ const PlayerList = ({ players, onKick, winnerName, gameStarted }) => {
             <div>
               <p className="font-bold text-white flex items-center gap-2">
                 {p.name}
-                {p.name === winnerName && (
+                {winners.includes(p.name) && (
                   <Trophy size={16} className="text-yellow-400" />
                 )}
               </p>
               {/* Show "To Go" count if available, default to 24 when game starts */}
               <p className="text-xs text-gray-400">
-                {gameStarted
-                  ? `${p.remaining !== undefined ? p.remaining : 24} to win`
-                  : "Ready"}
+                {gameStarted && !winners.includes(p.name)
+                  ? `${p.remaining !== undefined ? p.remaining : winningPattern} to win`
+                  : gameStarted && winners.includes(p.name)
+                    ? "BINGO!"
+                    : "Ready"}
               </p>
             </div>
 
-            <button
-              onClick={() => onKick(p.socketId)}
-              className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-800 rounded-full transition-colors"
-              title="Kick Player"
-            >
-              <Trash2 size={18} />
-            </button>
+            {onKick && (
+              <button
+                onClick={() => onKick(p.socketId)}
+                className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-800 rounded-full transition-colors"
+                title="Kick Player"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
           </div>
         ))}
       </div>
