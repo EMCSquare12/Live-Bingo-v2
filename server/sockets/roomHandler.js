@@ -195,7 +195,7 @@ module.exports = (io, socket) => {
     try {
       const room = await Room.findOne({ roomId });
       if (!room)
-        return socket.emit("error", "Room not found. It may have been closed.");
+        return socket.emit("room_destroyed", "Room not found. It may have been closed.");
 
       const existingPlayer = room.players.find(
         (p) =>
@@ -244,7 +244,7 @@ module.exports = (io, socket) => {
           });
         }
       } else {
-        socket.emit("error", "Player session not found in this room.");
+        socket.emit("session_expired", "Player session not found in this room.");
       }
     } catch (err) {
       console.error("Rejoin error:", err);

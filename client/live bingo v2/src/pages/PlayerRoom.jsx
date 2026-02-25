@@ -37,6 +37,15 @@ const PlayerRoom = () => {
   useEffect(() => {
     if (!socket) return;
 
+    const onSessionExpired = (message) => {
+      toast.error(message);
+      setRoom(null);
+      setPlayer(null);
+      sessionStorage.removeItem("room");
+      sessionStorage.removeItem("player");
+      navigate("/");
+    };
+
     const onGameStarted = ({ winners: currentWinners }) => {
       setGameState("playing");
       if (currentWinners) setWinners(currentWinners);
@@ -133,6 +142,7 @@ const PlayerRoom = () => {
       });
     };
 
+    socket.on("session_expired", onSessionExpired);
     socket.on("game_started", onGameStarted);
     socket.on("number_rolled", onNumberRolled);
     socket.on("mark_success", onMarkSuccess);
@@ -144,6 +154,7 @@ const PlayerRoom = () => {
     socket.on("game_reset", onGameReset);
 
     return () => {
+      socket.off("session_expired", onSessionExpired);
       socket.off("game_started", onGameStarted);
       socket.off("number_rolled", onNumberRolled);
       socket.off("mark_success", onMarkSuccess);
