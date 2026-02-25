@@ -1,7 +1,13 @@
 import React from "react";
 import { Trash2, User, Trophy } from "lucide-react";
 
-const PlayerList = ({winningPattern, players, onKick, winners = [], gameStarted }) => {
+const PlayerList = ({
+  winningPattern,
+  players,
+  onKick,
+  winners = [],
+  gameStarted,
+}) => {
   return (
     <div className="bg-gray-800 w-full md:w-80 border-l border-gray-700 flex flex-col h-full">
       <div className="p-4 border-b border-gray-700 bg-gray-900">
@@ -37,7 +43,7 @@ const PlayerList = ({winningPattern, players, onKick, winners = [], gameStarted 
               {/* Show "To Go" count if available, default to 24 when game starts */}
               <p className="text-xs text-gray-400">
                 {gameStarted && !winners.includes(p.name)
-                  ? `${p.remaining !== undefined ? p.remaining : winningPattern} to win`
+                  ? `${p.remaining !== undefined ? p.remaining : winningPattern === 25 ? 24 : winningPattern} to win`
                   : gameStarted && winners.includes(p.name)
                     ? "BINGO!"
                     : "Ready"}
