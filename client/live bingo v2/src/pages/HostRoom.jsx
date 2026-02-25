@@ -37,7 +37,6 @@ const HostRoom = () => {
   const [winners, setWinners] = useState(
     location.state?.gameState?.winners || [],
   );
-  const [gameStarted, setGameStarted] = useState(false);
 
   const initialPattern =
     location.state?.winningPattern ||
@@ -169,7 +168,6 @@ const HostRoom = () => {
   const handleStartGame = () => {
     if (players.length === 0) return toast.error("Wait for players to join!");
     socket.emit("start_game", { roomId: room });
-    setGameStarted(true);
   };
 
   const handleRoll = () => {
@@ -192,7 +190,6 @@ const HostRoom = () => {
     if (confirm("Restart Game? All progress will be lost.")) {
       socket.emit("restart_game", { roomId: room });
     }
-    setGameStarted(false);
   };
 
   const handleCloseRoom = () => {
@@ -377,7 +374,7 @@ const HostRoom = () => {
         players={players}
         onKick={isSpectator ? null : handleKick}
         winners={winners}
-        gameStarted={gameStarted}
+        gameStarted={gameState === "playing"}
       />
     </div>
   );

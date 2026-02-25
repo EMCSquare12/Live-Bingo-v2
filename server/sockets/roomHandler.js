@@ -53,8 +53,20 @@ module.exports = (io, socket) => {
       // Check if Game Started (Spectator Mode logic)
       if (roomCheck.status === "playing") {
         socket.join(roomId);
+
+        const gameState = roomCheck.toObject();
+
+        gameState.players.forEach((p) => {  
+          if (!p.isHost) {
+            p.remaining = calculateRemaining(
+              p.markedIndices,
+              gameState.winningPattern,
+            );
+          }
+        });
+
         socket.emit("spectator_joined", {
-          gameState: roomCheck,
+          gameState: gameState,
           message: "Game in progress. You are spectating.",
         });
         return;
@@ -195,7 +207,10 @@ module.exports = (io, socket) => {
     try {
       const room = await Room.findOne({ roomId });
       if (!room)
-        return socket.emit("room_destroyed", "Room not found. It may have been closed.");
+        return socket.emit(
+          "room_destroyed",
+          "Room not found. It may have been closed.",
+        );
 
       const existingPlayer = room.players.find(
         (p) =>
@@ -244,7 +259,10 @@ module.exports = (io, socket) => {
           });
         }
       } else {
-        socket.emit("session_expired", "Player session not found in this room.");
+        socket.emit(
+          "session_expired",
+          "Player session not found in this room.",
+        );
       }
     } catch (err) {
       console.error("Rejoin error:", err);
