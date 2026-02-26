@@ -19,7 +19,7 @@ connectDB();
 // Socket.io Setup
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173","http://live-bingo-v2.onrender.com/"],
+    origin: ["http://localhost:5173", "https://live-bingo-v2.netlify.app"],
     methods: ["GET", "POST"],
   },
 });
