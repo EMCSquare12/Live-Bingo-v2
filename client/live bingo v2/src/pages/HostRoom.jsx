@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Copy, XCircle, RotateCcw, Play, Settings, LogOut } from "lucide-react";
+import { Copy, XCircle, Play, Settings, LogOut } from "lucide-react";
 import toast from "react-hot-toast";
 import PlayerList from "../components/PlayerList";
 import PatternPicker from "../components/PatternPicker";
 
+// --- Helper functions for color coding ---
 const getBingoLetter = (num) => {
   if (!num) return "";
   if (num <= 15) return "B";
@@ -14,6 +15,32 @@ const getBingoLetter = (num) => {
   if (num <= 60) return "G";
   return "O";
 };
+
+const getBingoColorClasses = (num) => {
+  if (num <= 15) return "bg-red-900/50 text-red-200 border-red-700"; // B
+  if (num <= 30) return "bg-yellow-900/50 text-yellow-200 border-yellow-700"; // I
+  if (num <= 45) return "bg-green-900/50 text-green-200 border-green-700"; // N
+  if (num <= 60) return "bg-blue-900/50 text-blue-200 border-blue-700"; // G
+  return "bg-purple-900/50 text-purple-200 border-purple-700"; // O
+};
+
+const getBingoHeaderColor = (letter) => {
+  switch (letter) {
+    case "B":
+      return "text-red-400";
+    case "I":
+      return "text-yellow-400";
+    case "N":
+      return "text-green-400";
+    case "G":
+      return "text-blue-400";
+    case "O":
+      return "text-purple-400";
+    default:
+      return "text-gray-400";
+  }
+};
+// -----------------------------------------
 
 const HostRoom = () => {
   const { socket, room, player, disconnectSocket, setPlayer } = useSocket();
@@ -103,15 +130,18 @@ const HostRoom = () => {
       }, 100);
     });
 
-    socket.on("update_player_progress", ({ playerId, remaining }) => {
-      setPlayers((prev) =>
-        prev.map((p) =>
-          p._id === playerId || p.socketId === playerId
-            ? { ...p, remaining }
-            : p,
-        ),
-      );
-    });
+    socket.on(
+      "update_player_progress",
+      ({ playerId, remaining, markedIndices }) => {
+        setPlayers((prev) =>
+          prev.map((p) =>
+            p._id === playerId || p.socketId === playerId
+              ? { ...p, remaining, ...(markedIndices ? { markedIndices } : {}) }
+              : p,
+          ),
+        );
+      },
+    );
 
     socket.on("player_won", ({ winner, winners: updatedWinners, rank }) => {
       if (updatedWinners) setWinners(updatedWinners);
@@ -295,7 +325,9 @@ const HostRoom = () => {
           `}
           >
             {currentNumber && !isRolling && (
-              <span className="text-6xl font-black text-white/50 -mb-4 drop-shadow-md">
+              <span
+                className={`text-6xl font-black -mb-4 drop-shadow-md ${getBingoHeaderColor(getBingoLetter(currentNumber))}`}
+              >
                 {getBingoLetter(currentNumber)}
               </span>
             )}
@@ -346,14 +378,16 @@ const HostRoom = () => {
           <div className="flex flex-col gap-3">
             {["B", "I", "N", "G", "O"].map((letter) => (
               <div key={letter} className="flex items-start gap-4">
-                <span className="w-8 h-8 flex items-center justify-center font-black text-2xl text-pink-500 drop-shadow-sm">
+                <span
+                  className={`w-8 h-8 flex items-center justify-center font-black text-2xl drop-shadow-sm ${getBingoHeaderColor(letter)}`}
+                >
                   {letter}
                 </span>
                 <div className="flex flex-wrap gap-2 flex-1">
                   {groupedHistory[letter].map((num) => (
                     <span
                       key={num}
-                      className="w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full text-sm font-bold border border-gray-600 shadow-sm"
+                      className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold border shadow-sm ${getBingoColorClasses(num)}`}
                     >
                       {num}
                     </span>
@@ -375,6 +409,7 @@ const HostRoom = () => {
         onKick={isSpectator ? null : handleKick}
         winners={winners}
         gameStarted={gameState === "playing"}
+        winningPattern={winningPattern}
       />
     </div>
   );

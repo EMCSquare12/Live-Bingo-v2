@@ -23,7 +23,7 @@ const generateBingoCard = () => {
       const r = Math.floor(Math.random() * (max - min + 1)) + min;
       if (!nums.includes(r)) nums.push(r);
     }
-    nums.sort((a, b) => a - b);
+
     for (let row = 0; row < 5; row++) {
       card[row][col] = nums[row];
     }

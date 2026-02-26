@@ -168,6 +168,7 @@ module.exports = (io, socket) => {
               io.to(roomId).emit("update_player_progress", {
                 playerId: p._id,
                 remaining: remaining,
+                markedIndices: p.markedIndices,
               });
             }
           });
@@ -276,6 +277,7 @@ module.exports = (io, socket) => {
               socket.emit("update_player_progress", {
                 playerId: p._id,
                 remaining: p.remaining,
+                markedIndices: p.markedIndices,
               });
             }
           });
@@ -381,6 +383,7 @@ module.exports = (io, socket) => {
         io.to(roomId).emit("update_player_progress", {
           playerId: updatedPlayer._id,
           remaining: remaining,
+          markedIndices: updatedPlayer.markedIndices,
         });
 
         socket.emit("mark_success", { cellIndex });

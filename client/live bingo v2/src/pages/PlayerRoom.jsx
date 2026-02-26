@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSocket } from "../context/SocketContext";
-import { useNavigate } from "react-router-dom";
-import { LogOut, RefreshCw, Trophy } from "lucide-react";
-import toast from "react-hot-toast";
+import { useNavigate, useLocation } from "react-router-dom";
 import BingoCard from "../components/BingoCard";
+import Confetti from "react-confetti";
+import toast from "react-hot-toast";
+import { LogOut } from "lucide-react";
 
+// --- Helper functions for color coding ---
 const getBingoLetter = (num) => {
   if (!num) return "";
   if (num <= 15) return "B";
@@ -14,297 +16,316 @@ const getBingoLetter = (num) => {
   return "O";
 };
 
-const PlayerRoom = () => {
-  const { socket, room, player, disconnectSocket, setPlayer, setRoom } =
-    useSocket();
-  const navigate = useNavigate();
+const getBingoColorClasses = (num) => {
+  if (num <= 15) return "bg-red-900/50 text-red-200 border-red-700"; // B
+  if (num <= 30) return "bg-yellow-900/50 text-yellow-200 border-yellow-700"; // I
+  if (num <= 45) return "bg-green-900/50 text-green-200 border-green-700"; // N
+  if (num <= 60) return "bg-blue-900/50 text-blue-200 border-blue-700"; // G
+  return "bg-purple-900/50 text-purple-200 border-purple-700"; // O
+};
 
-  // Local Game State
-  const [isRolling, setIsRolling] = useState(false);
-  const [gameState, setGameState] = useState("waiting");
+const getBingoHeaderColor = (letter) => {
+  switch (letter) {
+    case "B":
+      return "text-red-400";
+    case "I":
+      return "text-yellow-400";
+    case "N":
+      return "text-green-400";
+    case "G":
+      return "text-blue-400";
+    case "O":
+      return "text-purple-400";
+    default:
+      return "text-gray-400";
+  }
+};
+// -----------------------------------------
+
+const PlayerRoom = () => {
+  const { socket, room, player, setPlayer, disconnectSocket } = useSocket();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [gameState, setGameState] = useState(
+    location.state?.gameState?.status || "waiting",
+  );
+  const [currentNumber, setCurrentNumber] = useState(
+    location.state?.gameState?.currentNumber || null,
+  );
+  const [history, setHistory] = useState(
+    location.state?.gameState?.numbersDrawn || [],
+  );
+  const [winners, setWinners] = useState(
+    location.state?.gameState?.winners || [],
+  );
+  const [winningPattern, setWinningPattern] = useState(
+    location.state?.gameState?.winningPattern || [],
+  );
+
   const [cardMatrix, setCardMatrix] = useState(player?.cardMatrix || []);
   const [markedIndices, setMarkedIndices] = useState(
     player?.markedIndices || [12],
   );
-  const [lastCalledNumber, setLastCalledNumber] = useState(null);
-  const [calledHistory, setCalledHistory] = useState([]);
 
-  // Track Winners Data
-  const [winners, setWinners] = useState([]);
-  const [hasWon, setHasWon] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [hasBingo, setHasBingo] = useState(false);
+  const [isRolling, setIsRolling] = useState(false);
 
-  // --- SOCKET LISTENERS ---
+  const checkWinCondition = useCallback(
+    (indices) => {
+      if (!winningPattern || winningPattern.length === 0) return false;
+      return winningPattern.every((index) => indices.includes(index));
+    },
+    [winningPattern],
+  );
+
   useEffect(() => {
     if (!socket) return;
 
-    const onSessionExpired = (message) => {
-      toast.error(message);
-      setRoom(null);
-      setPlayer(null);
-      sessionStorage.removeItem("room");
-      sessionStorage.removeItem("player");
-      navigate("/");
-    };
-
-    const onGameStarted = ({ winners: currentWinners }) => {
+    socket.on("game_started", ({ winners: initialWinners }) => {
       setGameState("playing");
-      if (currentWinners) setWinners(currentWinners);
-      if (currentWinners && currentWinners.includes(player?.name))
-        setHasWon(true);
-      toast("Game Started! Good Luck!", { icon: "🍀" });
-    };
+      if (initialWinners) setWinners(initialWinners);
+      toast.success("Game Started! Good luck!");
+    });
 
-    const onNumberRolled = ({ number, history }) => {
+    socket.on("number_rolled", ({ number, history: newHistory }) => {
       setIsRolling(true);
 
+      // Small animation for rolling number
       let i = 0;
       const interval = setInterval(() => {
-        setLastCalledNumber(Math.floor(Math.random() * 75) + 1);
+        setCurrentNumber(Math.floor(Math.random() * 75) + 1);
         i++;
-        if (i > 10) {
+        if (i > 5) {
           clearInterval(interval);
           setIsRolling(false);
-          setLastCalledNumber(number);
-          setCalledHistory(history);
+          setCurrentNumber(number);
+          setHistory(newHistory);
+          toast(`Number drawn: ${getBingoLetter(number)} ${number}`, {
+            icon: "🎲",
+            duration: 3000,
+          });
         }
       }, 100);
-    };
+    });
 
-    const onMarkSuccess = ({ cellIndex }) => {
-      setMarkedIndices((prev) => [...new Set([...prev, cellIndex])]);
-    };
+    socket.on("mark_success", ({ cellIndex }) => {
+      setMarkedIndices((prev) => {
+        const newIndices = [...prev, cellIndex];
+        if (checkWinCondition(newIndices)) {
+          setHasBingo(true);
+          toast.success("BINGO! Claim your win now!", { icon: "🎉" });
+        }
+        return newIndices;
+      });
+    });
 
-    const onPlayerWon = ({ winner, winners: updatedWinners, rank }) => {
+    socket.on("action_error", (msg) => {
+      toast.error(msg);
+    });
+
+    socket.on("player_won", ({ winner, winners: updatedWinners, rank }) => {
       if (updatedWinners) setWinners(updatedWinners);
-
       const suffix =
         rank === 1 ? "st" : rank === 2 ? "nd" : rank === 3 ? "rd" : "th";
 
-      if (winner === player?.name) {
-        if (rank === 1) {
-          toast.success("YOU WON 1ST PLACE! BINGO!!! 🏆", { duration: 5000 });
-        } else {
-          toast.success(
-            `YOU GOT BINGO! You are in ${rank}${suffix} place! 🎉`,
-            { duration: 5000 },
-          );
-        }
-        setHasWon(true);
+      if (winner === player.name) {
+        setShowConfetti(true);
+        toast.success(`You won ${rank}${suffix} place! 🎉`, {
+          duration: 8000,
+        });
+        setTimeout(() => setShowConfetti(false), 8000);
       } else {
-        toast.success(
-          `${winner} got BINGO (${rank}${suffix} place)! Game continues.`,
-          { icon: "🎉" },
-        );
+        toast(`${winner} got BINGO! (${rank}${suffix})`, { icon: "🏆" });
       }
-    };
+    });
 
-    const onFalseBingo = ({ name }) => {
-      if (name === player?.name) {
-        toast.error("You don't have BINGO yet! Keep playing.");
+    socket.on("false_bingo", ({ name }) => {
+      if (name === player.name) {
+        toast.error("False BINGO! Check your card.");
+        setHasBingo(false);
       } else {
-        toast(`${name} called a false BINGO! 🤡`, { icon: "🤡" });
+        toast(`${name} called a false BINGO! 🤡`);
       }
-    };
+    });
 
-    const onCardShuffled = (newMatrix) => {
-      setCardMatrix(newMatrix);
-      toast.success("Card Shuffled!");
-    };
-
-    const onActionError = (msg) => toast.error(msg);
-
-    const onRoomDestroyed = (message) => {
-      toast.success(message);
-      setRoom(null);
-      setPlayer(null);
-      sessionStorage.removeItem("room");
-      sessionStorage.removeItem("player");
-      navigate("/");
-    };
-
-    const onGameReset = ({ message, players }) => {
+    socket.on("game_reset", ({ message, players: updatedPlayers }) => {
       setGameState("waiting");
-      setLastCalledNumber(null);
-      setCalledHistory([]);
-      setMarkedIndices([12]);
+      setHistory([]);
+      setCurrentNumber(null);
       setWinners([]);
-      setHasWon(false);
+      setMarkedIndices([12]);
+      setHasBingo(false);
+      setShowConfetti(false);
+      setIsRolling(false);
 
-      const me = players.find(
-        (p) => p.socketId === socket.id || p.name === player?.name,
-      );
-      if (me && me.cardMatrix) {
+      const me = updatedPlayers.find((p) => p.socketId === socket.id);
+      if (me) {
+        setPlayer(me);
         setCardMatrix(me.cardMatrix);
       }
+      toast(message || "Game reset by host.");
+    });
 
-      toast.success(message || "New Game! Your card has been shuffled.", {
-        icon: "🔄",
-      });
-    };
+    socket.on("card_shuffled", (newMatrix) => {
+      setCardMatrix(newMatrix);
+      toast.success("Card shuffled!");
+    });
 
-    const onRoomJoined = ({ player: updatedPlayer }) => {
-      if (updatedPlayer) {
-        if (updatedPlayer.cardMatrix) setCardMatrix(updatedPlayer.cardMatrix);
-        if (updatedPlayer.markedIndices)
-          setMarkedIndices(updatedPlayer.markedIndices);
-      }
-    };
-
-    socket.on("session_expired", onSessionExpired);
-    socket.on("game_started", onGameStarted);
-    socket.on("number_rolled", onNumberRolled);
-    socket.on("mark_success", onMarkSuccess);
-    socket.on("player_won", onPlayerWon);
-    socket.on("false_bingo", onFalseBingo);
-    socket.on("card_shuffled", onCardShuffled);
-    socket.on("action_error", onActionError);
-    socket.on("room_destroyed", onRoomDestroyed);
-    socket.on("game_reset", onGameReset);
-    socket.on("room_joined", onRoomJoined);
+    socket.on("room_destroyed", (message) => {
+      toast.error(message);
+      navigate("/");
+    });
 
     return () => {
-      socket.off("session_expired", onSessionExpired);
-      socket.off("game_started", onGameStarted);
-      socket.off("number_rolled", onNumberRolled);
-      socket.off("mark_success", onMarkSuccess);
-      socket.off("player_won", onPlayerWon);
-      socket.off("false_bingo", onFalseBingo);
-      socket.off("card_shuffled", onCardShuffled);
-      socket.off("action_error", onActionError);
-      socket.off("room_destroyed", onRoomDestroyed);
-      socket.off("game_reset", onGameReset);
-      socket.off("room_joined", onRoomJoined);
+      socket.off("game_started");
+      socket.off("number_rolled");
+      socket.off("mark_success");
+      socket.off("action_error");
+      socket.off("player_won");
+      socket.off("false_bingo");
+      socket.off("game_reset");
+      socket.off("card_shuffled");
+      socket.off("room_destroyed");
     };
-  }, [socket, player]);
+  }, [socket, navigate, player.name, setPlayer, checkWinCondition]);
 
-  const handleLeave = () => {
-    if (confirm("Are you sure you want to leave?")) {
-      socket.emit("leave_room", { roomId: room });
-      setRoom(null);
-      setPlayer(null);
-      sessionStorage.removeItem("room");
-      sessionStorage.removeItem("player");
-      disconnectSocket();
-      navigate("/");
-    }
-  };
+  const handleCellClick = (rowIndex, colIndex) => {
+    if (gameState !== "playing") return;
+    const cellIndex = rowIndex * 5 + colIndex;
+    if (cellIndex === 12) return; // Skip free space
 
-  const handleCellClick = (index, number) => {
-    if (gameState !== "playing") {
-      if (gameState === "waiting") return toast("Game hasn't started yet.");
-      return;
-    }
-    if (markedIndices.includes(index)) return;
-
-    if (!calledHistory.includes(number)) {
-      toast.error(`${number} hasn't been called!`);
-      return;
-    }
-    socket.emit("mark_number", { roomId: room, number, cellIndex: index });
+    const number = cardMatrix[rowIndex][colIndex];
+    socket.emit("mark_number", { roomId: room, number, cellIndex });
   };
 
   const handleClaimBingo = () => {
-    socket.emit("claim_bingo", { roomId: room });
+    if (hasBingo) {
+      socket.emit("claim_bingo", { roomId: room });
+      setHasBingo(false); // Prevent spamming
+    }
   };
 
   const handleShuffle = () => {
     socket.emit("request_shuffle", { roomId: room });
   };
 
+  const handleLeaveRoom = () => {
+    if (
+      confirm(
+        gameState === "playing"
+          ? "Leave game in progress? You can't rejoin this session."
+          : "Leave the room?",
+      )
+    ) {
+      socket.emit("leave_room", { roomId: room });
+      disconnectSocket();
+      navigate("/");
+    }
+  };
+
   const groupedHistory = { B: [], I: [], N: [], G: [], O: [] };
-  calledHistory.forEach((num) => {
+  history.forEach((num) => {
     groupedHistory[getBingoLetter(num)].push(num);
   });
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 pb-12">
-      <div className="w-full max-w-6xl flex justify-between items-center mb-6 bg-gray-800 p-3 rounded-xl border border-gray-700">
-        <div>
-          <h2 className="font-bold text-lg">{player?.name || "Player"}</h2>
-          <p className="text-xs text-gray-400 font-mono">ROOM: {room}</p>
-        </div>
-        <button
-          onClick={handleLeave}
-          className="p-2 bg-red-900/50 hover:bg-red-900 text-red-200 rounded-lg transition-colors"
-        >
-          <LogOut size={20} />
-        </button>
-      </div>
+    <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-hidden">
+      {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
 
-      <div className="w-full max-w-6xl flex flex-col lg:flex-row items-center mt-10 lg:items-start justify-center gap-8">
-        <div className="flex  flex-col items-center w-full  lg:flex-1 order-1 lg:order-1 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="text-gray-400 text-sm uppercase tracking-widest font-bold mb-1">
-            {gameState === "waiting" ? "Waiting for Host..." : "Current Number"}
+      {/* Left Panel - Game Info & History */}
+      <div className="flex-1 flex flex-col p-4 md:p-8 relative overflow-y-auto order-2 md:order-1">
+        <div className="flex justify-between items-center mb-6 bg-gray-800 p-4 rounded-xl shadow-lg">
+          <div>
+            <h1 className="text-2xl font-bold text-pink-500">{player.name}</h1>
+            <p className="font-mono text-sm text-gray-400">Room: {room}</p>
           </div>
+          <button
+            onClick={handleLeaveRoom}
+            className="p-2 text-gray-400 hover:text-red-500 bg-gray-700 hover:bg-red-900/20 rounded-lg transition-colors"
+            title="Leave Room"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
+
+        {/* Current Number Display */}
+        <div className="mb-8 flex justify-center">
           <div
             className={`
-              w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2 mx-auto
-              bg-linear-to-br from-blue-600 to-purple-700 shadow-[0_0_30px_rgba(59,130,246,0.5)]
-              border-4 border-white transition-all duration-300 transform
-              ${isRolling ? "animate-bounce scale-110" : "scale-100"}
-            `}
+            w-32 h-32 rounded-full flex flex-col items-center justify-center gap-1
+            bg-gradient-to-br from-pink-600 to-purple-700 shadow-[0_0_20px_rgba(236,72,153,0.5)]
+            border-4 border-white transition-all duration-300 transform
+            ${isRolling ? "animate-bounce scale-110" : "scale-100"}
+          `}
           >
-            {lastCalledNumber && !isRolling && (
-              <span className="text-6xl font-black text-white/50 -mb-4 drop-shadow-md">
-                {getBingoLetter(lastCalledNumber)}
+            {currentNumber && !isRolling && (
+              <span
+                className={`text-4xl font-black -mb-2 drop-shadow-md ${getBingoHeaderColor(getBingoLetter(currentNumber))}`}
+              >
+                {getBingoLetter(currentNumber)}
               </span>
             )}
-            <span className="text-8xl font-black text-white drop-shadow-md z-10">
-              {lastCalledNumber || "--"}
+            <span className="text-6xl font-black text-white drop-shadow-md">
+              {currentNumber || "--"}
             </span>
           </div>
         </div>
 
-        <div className="flex flex-col items-center w-full lg:flex-1 order-2 lg:order-2">
-          <BingoCard
-            matrix={cardMatrix}
-            markedIndices={markedIndices}
-            onCellClick={handleCellClick}
-            isSpectator={player?.isSpectator}
-          />
+        {/* Actions */}
+        <div className="flex justify-center gap-4 mb-8">
+          {gameState === "waiting" && (
+            <button
+              onClick={handleShuffle}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 font-bold rounded-full shadow-lg transition-colors"
+            >
+              Shuffle Card 🔄
+            </button>
+          )}
 
-          <div className="mt-8 w-full max-w-md flex gap-4">
-            {gameState === "waiting" && !player?.isSpectator && (
-              <button
-                onClick={handleShuffle}
-                className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-bold flex items-center justify-center gap-2"
-              >
-                <RefreshCw size={18} /> Shuffle Card
-              </button>
-            )}
-
-            {gameState === "playing" && !player?.isSpectator && !hasWon && (
-              <button
-                onClick={handleClaimBingo}
-                className="flex-1 py-4 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black text-2xl shadow-lg hover:scale-105 transition-transform flex items-center justify-center gap-2 animate-pulse"
-              >
-                <Trophy size={28} /> BINGO!
-              </button>
-            )}
-          </div>
+          {gameState === "playing" && (
+            <button
+              onClick={handleClaimBingo}
+              disabled={!hasBingo || winners.includes(player.name)}
+              className={`
+                px-8 py-3 text-2xl font-black rounded-full shadow-lg transition-all
+                ${
+                  hasBingo && !winners.includes(player.name)
+                    ? "bg-gradient-to-r from-yellow-400 to-orange-500 hover:scale-105 animate-pulse text-gray-900"
+                    : "bg-gray-700 text-gray-500 cursor-not-allowed"
+                }
+              `}
+            >
+              BINGO! 🎉
+            </button>
+          )}
         </div>
 
-        <div className="w-full max-w-md mx-auto lg:flex-1 lg:max-w-none bg-gray-800 p-6 rounded-xl border border-gray-700 shadow-xl order-3">
-          <h3 className="text-sm text-gray-400 font-bold mb-6 uppercase tracking-wider border-b border-gray-700 pb-3">
+        {/* Call History with Color Coding */}
+        <div className="mt-auto bg-gray-800 p-4 rounded-xl w-full">
+          <h3 className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-wide border-b border-gray-700 pb-2">
             Call History
           </h3>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             {["B", "I", "N", "G", "O"].map((letter) => (
               <div key={letter} className="flex items-start gap-4">
-                <span className="w-10 h-10 flex items-center justify-center font-black text-2xl text-pink-500 drop-shadow-sm bg-gray-900 rounded-lg border border-gray-700">
+                <span
+                  className={`w-8 h-8 flex items-center justify-center font-black text-2xl drop-shadow-sm ${getBingoHeaderColor(letter)}`}
+                >
                   {letter}
                 </span>
-                <div className="flex flex-wrap gap-2 flex-1 pt-1">
+                <div className="flex flex-wrap gap-2 flex-1">
                   {groupedHistory[letter].map((num) => (
                     <span
                       key={num}
-                      className="w-9 h-9 flex items-center justify-center bg-gray-700 rounded-full text-sm font-bold border border-gray-600 shadow-sm"
+                      className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold border shadow-sm ${getBingoColorClasses(num)}`}
                     >
                       {num}
                     </span>
                   ))}
                   {groupedHistory[letter].length === 0 && (
-                    <span className="text-gray-500 text-sm italic py-1 mt-1">
+                    <span className="text-gray-500 text-sm italic py-1">
                       --
                     </span>
                   )}
@@ -312,6 +333,18 @@ const PlayerRoom = () => {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Right Panel - Bingo Card */}
+      <div className="flex-1 bg-gray-900 p-4 md:p-8 flex items-center justify-center order-1 md:order-2 border-b md:border-b-0 md:border-l border-gray-700">
+        <div className="w-full max-w-xl aspect-square relative">
+          <BingoCard
+            matrix={cardMatrix}
+            markedIndices={markedIndices}
+            onCellClick={handleCellClick}
+            winningPattern={winningPattern}
+          />
         </div>
       </div>
     </div>
