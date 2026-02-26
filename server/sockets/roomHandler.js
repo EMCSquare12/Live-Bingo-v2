@@ -263,6 +263,7 @@ module.exports = (io, socket) => {
           socket.emit("game_started", {
             status: "playing",
             winners: room.winners || [],
+            winningPattern: room.winningPattern,
           });
 
           if (room.currentNumber) {
@@ -312,6 +313,7 @@ module.exports = (io, socket) => {
       io.to(roomId).emit("game_started", {
         status: "playing",
         winners: room.winners || [],
+        winningPattern: room.winningPattern,
       });
       // Initializing the players stat targets explicitly
       io.to(roomId).emit("update_player_list", getPlayersWithRemaining(room));

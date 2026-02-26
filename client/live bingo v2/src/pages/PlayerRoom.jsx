@@ -81,11 +81,20 @@ const PlayerRoom = () => {
   );
 
   useEffect(() => {
+    if (gameState === "playing" && winningPattern?.length > 0) {
+      if (checkWinCondition(markedIndices)) {
+        setHasBingo(true);
+      }
+    }
+  }, [markedIndices, winningPattern, gameState, checkWinCondition]);
+
+  useEffect(() => {
     if (!socket) return;
 
     socket.on("game_started", ({ winners: initialWinners }) => {
       setGameState("playing");
       if (initialWinners) setWinners(initialWinners);
+      if (serverPattern) setWinningPattern(serverPattern);
       toast.success("Game Started! Good luck!");
     });
 
@@ -143,7 +152,7 @@ const PlayerRoom = () => {
 
     socket.on("false_bingo", ({ name }) => {
       if (name === player.name) {
-        toast.error("False BINGO! Check your card.");
+        toast.error("False ! Check your card.");
         setHasBingo(false);
       } else {
         toast(`${name} called a false BINGO! 🤡`);
@@ -191,13 +200,11 @@ const PlayerRoom = () => {
     };
   }, [socket, navigate, player.name, setPlayer, checkWinCondition]);
 
-  const handleCellClick = (rowIndex, colIndex) => {
+  const handleCellClick = (index, num) => {
     if (gameState !== "playing") return;
-    const cellIndex = rowIndex * 5 + colIndex;
-    if (cellIndex === 12) return; // Skip free space
+    if (index === 12) return;
 
-    const number = cardMatrix[rowIndex][colIndex];
-    socket.emit("mark_number", { roomId: room, number, cellIndex });
+    socket.emit("mark_number", { roomId: room, number: num, cellIndex: index });
   };
 
   const handleClaimBingo = () => {
