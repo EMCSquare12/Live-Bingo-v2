@@ -264,30 +264,43 @@ const HostRoom = () => {
   });
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-hidden">
-      <div className="flex-1 flex flex-col p-4 md:p-8 relative overflow-y-auto">
-        <div className="flex justify-between items-center mb-8 bg-gray-800 p-4 rounded-xl shadow-lg">
-          <div>
-            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-linear-to-r from-pink-500 to-yellow-500">
-              {isSpectator ? "Spectator View" : "Host Panel"}
-            </h1>
-            <div className="flex flex-col md:flex-row md:items-center gap-0 md:gap-2 text-[11px] md:text-sm text-gray-400 mt-0.5">
-              <span className="font-mono p-1 border border-gray-500 rounded-md tracking-wider text-gray-400">
-                Host: {hostName?.toUpperCase()}
-              </span>
-              <span className="hidden md:inline text-gray-600">•</span>
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_320px] md:grid-rows-[auto_1fr] h-screen bg-gray-900 text-white overflow-y-auto md:overflow-hidden">
+      {/* Mobile Overlay for Sidebar */}
+      {showPlayersSidebar && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setShowPlayersSidebar(false)}
+        />
+      )}
 
-              <div
-                onClick={handleCopyCode}
-                className="flex items-center p-1 rounded-md border border-gray-500 gap-1 cursor-pointer hover:text-yellow-400 transition-colors"
-                title="Copy Room Code"
-              >
-                <span className="font-mono  tracking-wider text-gray-400">
-                  CODE: {room}
+      {/* Part A: Header, Roll Info & Actions (Order 1 on Mobile) */}
+      <div className="flex flex-col p-4 md:p-8 md:pb-4 order-1 md:col-start-1 md:row-start-1">
+        {/* Responsive Header */}
+        <div className="flex justify-between items-center mb-6 md:mb-8 bg-gray-800 p-3 md:p-4 rounded-xl shadow-lg">
+          <div className="flex items-center gap-3 md:gap-6 min-w-0">
+            <div className="min-w-0 flex flex-col gap-2">
+              <h1 className="text-lg md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500 truncate">
+                {isSpectator ? "Spectator View" : "Host Panel"}
+              </h1>
+
+              <div className="flex flex-col md:flex-row md:items-center md:gap-2 text-[11px] md:text-sm text-gray-400 mt-0.5">
+                <span className="font-mono rounded-md border border-gray-500 p-1 tracking-wider text-gray-400">
+                  Host: {hostName.toUpperCase()}
                 </span>
-                <Copy size={12} className="md:w-4 md:h-4" />
+                <span className="hidden md:inline text-gray-600">•</span>
+                <div
+                  onClick={handleCopyCode}
+                  className="flex items-center gap-1 cursor-pointer rounded-md border border-gray-500 p-1 hover:text-yellow-400 transition-colors"
+                  title="Copy Room Code"
+                >
+                  <span className="font-mono   tracking-wider text-gray-400">
+                    CODE: {room}
+                  </span>
+                  <Copy size={12} className="md:w-4 md:h-4" />
+                </div>
               </div>
             </div>
+
             {/* Winning Pattern Mini-Grid */}
             <div className="flex flex-col items-center bg-gray-900/50 p-1 md:p-1.5 rounded-lg shrink-0">
               <span className="text-[8px] md:text-[10px] text-gray-400 uppercase font-bold mb-0.5 tracking-wider">
@@ -316,55 +329,64 @@ const HostRoom = () => {
             </div>
           </div>
 
-          <div className="flex gap-2">
+          {/* Action Buttons Container */}
+          <div className="flex gap-1.5 md:gap-2 shrink-0 ml-2">
+            {/* Mobile Players Toggle Button */}
             <button
               onClick={() => setShowPlayersSidebar(true)}
-              className="md:hidden p-2 bg-gray-700 hover:bg-gray-600 rounded-lg relative"
+              className="md:hidden p-2 bg-gray-700 hover:bg-gray-600 rounded-lg relative flex items-center justify-center"
               title="Show Players"
             >
-              <Users size={20} />
+              <Users size={16} />
               {players.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
                   {players.length}
                 </span>
               )}
             </button>
+
             {!isSpectator && gameState === "waiting" && (
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
+                className="hidden md:flex p-2 md:px-3 md:py-2 bg-gray-700 hover:bg-gray-600 rounded-lg items-center gap-2"
                 title="Edit Pattern"
               >
-                <Settings size={20} />
+                <Settings size={18} />
               </button>
             )}
 
             {isSpectator ? (
               <button
                 onClick={handleLeaveAsSpectator}
-                className="px-4 py-2 bg-red-900/50 hover:bg-red-900 rounded-lg flex items-center gap-2 font-bold"
+                className="p-2 md:px-4 md:py-2 bg-red-900/50 hover:bg-red-900 rounded-lg flex items-center justify-center gap-2 font-bold text-sm"
               >
-                <LogOut size={18} /> Leave
+                <LogOut size={16} className="md:w-5 md:h-5" />
+                <span className="hidden md:inline">Leave</span>
               </button>
             ) : (
               <>
                 <button
                   onClick={handleRestart}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center gap-2 font-bold"
+                  className="p-2 md:px-4 md:py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center gap-2 font-bold text-sm"
+                  title="New Game"
                 >
-                  New Game
+                  <span className="hidden md:inline">New Game</span>
+                  <span className="md:hidden">New</span>
                 </button>
                 <button
                   onClick={handleCloseRoom}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 font-bold"
+                  className="p-2 md:px-4 md:py-2 bg-red-600 hover:bg-red-700 rounded-lg flex items-center justify-center gap-2 font-bold text-sm"
+                  title="End Room"
                 >
-                  <XCircle size={18} /> End
+                  <XCircle size={16} className="md:w-5 md:h-5" />
+                  <span className="hidden md:inline">End</span>
                 </button>
               </>
             )}
           </div>
         </div>
 
+        {/* Pattern Editor Modal */}
         {showSettings && !isSpectator && (
           <>
             <div
@@ -384,21 +406,22 @@ const HostRoom = () => {
           </>
         )}
 
-        <div className="flex-1 flex flex-col items-center justify-center gap-8 min-h-100">
+        {/* Current Number & Actions */}
+        <div className="mb-8 md:mb-4 flex flex-col items-center justify-center gap-6">
           <div
             className={`
-            w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2 text-white
+            w-40 h-40 md:w-48 md:h-48 rounded-full flex flex-col items-center justify-center gap-2 text-white
             border-4 border-white transition-all duration-300 transform
             ${isRolling ? "animate-bounce scale-110" : "scale-100"}
             ${getBallColorTheme(currentNumber, isRolling)}
           `}
           >
             {currentNumber && !isRolling && (
-              <span className="text-6xl font-black -mb-4 drop-shadow-md text-white/90">
+              <span className="text-5xl md:text-6xl font-black -mb-3 md:-mb-4 drop-shadow-md text-white/90">
                 {getBingoLetter(currentNumber)}
               </span>
             )}
-            <span className="text-8xl font-black drop-shadow-md z-10">
+            <span className="text-7xl md:text-8xl font-black drop-shadow-md z-10">
               {currentNumber || "--"}
             </span>
           </div>
@@ -432,13 +455,41 @@ const HostRoom = () => {
           )}
 
           {isSpectator && gameState === "playing" && (
-            <div className="text-xl font-bold text-gray-400 animate-pulse mt-4">
+            <div className="text-xl font-bold text-gray-400 animate-pulse mt-2">
               Game in progress...
             </div>
           )}
         </div>
+      </div>
 
-        <div className="mt-8 bg-gray-800 p-4 rounded-xl w-full">
+      {/* Part B: Player List Sidebar */}
+      <div
+        className={`
+          fixed inset-y-0 right-0 z-50 w-80 h-full shadow-2xl transform transition-transform duration-300 ease-in-out bg-gray-800
+          md:static md:translate-x-0 md:col-start-2 md:row-start-1 md:row-span-2 md:shadow-none md:z-auto md:border-l md:border-gray-700
+          ${showPlayersSidebar ? "translate-x-0" : "translate-x-full"}
+        `}
+      >
+        {/* Mobile Close Button */}
+        <button
+          onClick={() => setShowPlayersSidebar(false)}
+          className="md:hidden absolute top-4 right-4 z-[60] p-2 bg-gray-800 text-gray-300 hover:text-white rounded-lg shadow-md border border-gray-700"
+        >
+          <X size={18} />
+        </button>
+
+        <PlayerList
+          players={players}
+          onKick={isSpectator ? null : handleKick}
+          winners={winners}
+          gameStarted={gameState === "playing"}
+          winningPattern={winningPattern}
+        />
+      </div>
+
+      {/* Part C: Call History (Order 3 on Mobile) */}
+      <div className="flex flex-col p-4 md:p-8 md:pt-0 order-3 md:col-start-1 md:row-start-2 md:overflow-y-auto">
+        <div className="md:mt-auto bg-gray-800 p-4 rounded-xl w-full">
           <h3 className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-wide border-b border-gray-700 pb-2">
             Call History
           </h3>
@@ -469,38 +520,6 @@ const HostRoom = () => {
             ))}
           </div>
         </div>
-      </div>
-
-      {showPlayersSidebar && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
-          onClick={() => setShowPlayersSidebar(false)}
-        />
-      )}
-
-      {/* Sidebar Wrapper */}
-      <div
-        className={`
-          fixed inset-y-0 right-0 z-50 w-80 h-full shadow-2xl transform transition-transform duration-300 ease-in-out
-          md:static md:translate-x-0 md:w-auto md:h-full md:shadow-none md:z-auto
-          ${showPlayersSidebar ? "translate-x-0" : "translate-x-full"}
-        `}
-      >
-        {/* Mobile Close Button */}
-        <button
-          onClick={() => setShowPlayersSidebar(false)}
-          className="md:hidden absolute top-4 right-4 z-60 p-2 bg-gray-800 text-gray-300 hover:text-white rounded-lg shadow-md border border-gray-700"
-        >
-          <X size={18} />
-        </button>
-
-        <PlayerList
-          players={players}
-          onKick={isSpectator ? null : handleKick}
-          winners={winners}
-          gameStarted={gameState === "playing"}
-          winningPattern={winningPattern}
-        />
       </div>
     </div>
   );

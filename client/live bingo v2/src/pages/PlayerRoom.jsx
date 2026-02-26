@@ -265,14 +265,13 @@ const PlayerRoom = () => {
   });
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-[auto_1fr] h-screen bg-gray-900 text-white overflow-y-auto md:overflow-hidden">
+    <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-[auto_1fr] h-screen bg-gray-900 text-white overflow-y-auto md:overflow-hidden pb-24 md:pb  -0">
       {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
-
       {/* Part A: Header, Game Info & Actions (Order 1 on Mobile) */}
       <div className="flex flex-col p-4 md:p-8 md:pb-4 order-1 md:col-start-1 md:row-start-1">
         <div className="flex justify-between items-center mb-6 bg-gray-800 p-4 rounded-xl shadow-lg">
           <div className="flex items-center gap-3 md:gap-6">
-            <div>
+            <div className="min-w-0 flex flex-col gap-2">
               <h1 className="text-lg md:text-2xl font-bold text-pink-500 truncate max-w-30 md:max-w-xs">
                 {player.name}
               </h1>
@@ -335,7 +334,6 @@ const PlayerRoom = () => {
           </div>
         </div>
       </div>
-
       {/* Part B: Bingo Card (Order 2 on Mobile) */}
       <div className="bg-gray-900 p-4 py-8 md:p-8 flex items-center justify-center order-2 md:col-start-2 md:row-start-1 md:row-span-2 border-y md:border-y-0 md:border-l border-gray-700">
         <div className="w-full max-w-xl aspect-square flex flex-col gap-4 relative">
@@ -346,36 +344,37 @@ const PlayerRoom = () => {
             winningPattern={winningPattern}
           />
 
-          <div className="w-full max-w-md mx-auto flex justify-center gap-4 mb-4 md:mb-0">
-            {gameState === "waiting" && (
-              <button
-                onClick={handleShuffle}
-                className="px-6 py-4 w-full bg-blue-600 hover:bg-blue-500 font-bold rounded-full shadow-lg transition-colors"
-              >
-                Shuffle Card
-              </button>
-            )}
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 z-50 md:static md:bg-transparent md:border-none md:p-0 md:mt-2 md:backdrop-blur-none shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.5)] md:shadow-none">
+            <div className="w-full max-w-md mx-auto flex justify-center gap-4">
+              {gameState === "waiting" && (
+                <button
+                  onClick={handleShuffle}
+                  className="px-6 py-4 w-full bg-blue-600 hover:bg-blue-500 font-bold rounded-md shadow-lg transition-colors"
+                >
+                  Shuffle Card
+                </button>
+              )}
 
-            {gameState === "playing" && (
-              <button
-                onClick={handleClaimBingo}
-                disabled={!hasBingo || winners.includes(player.name)}
-                className={`
-                px-8 py-4 w-full text-2xl font-black rounded-full shadow-lg transition-all
-                ${
-                  hasBingo && !winners.includes(player.name)
-                    ? "bg-linear-to-r from-yellow-400 to-orange-500 hover:scale-105 animate-pulse text-gray-900"
-                    : "bg-gray-700 text-gray-500 cursor-not-allowed"
-                }
-              `}
-              >
-                BINGO! 🎉
-              </button>
-            )}
+              {gameState === "playing" && (
+                <button
+                  onClick={handleClaimBingo}
+                  disabled={!hasBingo || winners.includes(player.name)}
+                  className={`
+                  px-8 py-4 w-full text-2xl font-black rounded-md shadow-lg transition-all
+                  ${
+                    hasBingo && !winners.includes(player.name)
+                      ? "bg-gradient-to-r from-yellow-400 to-orange-500 hover:scale-105 animate-pulse text-gray-900"
+                      : "bg-gray-700 text-gray-500 cursor-not-allowed"
+                  }
+                `}
+                >
+                  BINGO! 🎉
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-
       {/* Part C: Call History (Order 3 on Mobile) */}
       <div className="flex flex-col p-4 md:p-8 md:pt-0 order-3 md:col-start-1 md:row-start-2 md:overflow-y-auto">
         <div className="md:mt-auto bg-gray-800 p-4 rounded-xl w-full">

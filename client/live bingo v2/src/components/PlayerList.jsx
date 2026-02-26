@@ -31,16 +31,9 @@ const PlayerList = ({
     const aIsWinner = aIndex !== -1;
     const bIsWinner = bIndex !== -1;
 
-    // If both are winners, keep them in order of who won first
-    if (aIsWinner && bIsWinner) {
-      return aIndex - bIndex;
-    }
-    // Put winner 'a' before non-winner 'b'
+    if (aIsWinner && bIsWinner) return aIndex - bIndex;
     if (aIsWinner) return -1;
-    // Put winner 'b' before non-winner 'a'
     if (bIsWinner) return 1;
-
-    // If neither won, leave them in their original order
     return 0;
   });
 
@@ -61,7 +54,6 @@ const PlayerList = ({
     return `${index + 1}th Place 🏅`;
   };
 
-  // Dynamically calculate the actual numbers based on un-marked indexes mapped to the card matrix.
   const getRemainingNumbers = (player) => {
     if (
       !player.cardMatrix ||
@@ -86,15 +78,16 @@ const PlayerList = ({
   };
 
   return (
-    <div className="bg-gray-800 w-full md:w-80 border-l border-gray-700 flex flex-col h-full">
+    // FIX: Added `overflow-hidden w-full` to prevent the container from blowing out screen height
+    <div className="bg-gray-800 flex flex-col h-full w-full overflow-hidden">
       {/* Spectator Section */}
       {spectators.length > 0 && (
-        <div className="p-4 border-b border-gray-700 bg-gray-900">
+        <div className="p-4 border-b border-gray-700 bg-gray-900 shrink-0">
           <h2 className="text-sm font-bold text-gray-400 flex items-center gap-2 mb-3 uppercase tracking-wider">
             <Eye size={16} />
             Spectators ({spectators.length})
           </h2>
-          <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
+          <div className="flex flex-col gap-2 max-h-32 md:max-h-40 overflow-y-auto pr-1">
             {spectators.map((s) => (
               <div
                 key={s.socketId || s.id}
@@ -117,22 +110,21 @@ const PlayerList = ({
       )}
 
       {/* Active Players Header */}
-      <div className="p-4 border-b border-gray-700 bg-gray-900">
+      <div className="p-4 border-b border-gray-700 bg-gray-900 shrink-0">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <User className="text-pink-500" />
           Players ({activePlayers.length})
         </h2>
       </div>
 
-      {/* Active Players List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+      {/* Active Players List - flex-1 allows this to take remaining space and independently scroll! */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-2 pb-24 md:pb-4">
         {sortedActivePlayers.length === 0 && (
           <p className="text-gray-500 text-center mt-10">
             Waiting for players to join...
           </p>
         )}
 
-        {/* --- NOW MAPPING OVER THE SORTED ARRAY --- */}
         {sortedActivePlayers.map((p) => {
           const isWinner = winners.includes(p.name);
           const isViewed = viewedPlayers.has(p.socketId || p.id);
@@ -155,7 +147,7 @@ const PlayerList = ({
                     <Trophy size={16} className="text-yellow-400 shrink-0" />
                   )}
 
-                  {/* Eye Toggle beside individual player Name */}
+                  {/* Eye Toggle */}
                   {!isWinner && gameStarted && (
                     <button
                       onClick={() => toggleView(p.socketId || p.id)}
@@ -169,7 +161,6 @@ const PlayerList = ({
                   )}
                 </div>
 
-                {/* Render Needed Numbers as Color Chips */}
                 {isViewed && gameStarted && !isWinner ? (
                   <div className="mt-2">
                     <p className="text-xs text-gray-400 mb-1">Needs:</p>
