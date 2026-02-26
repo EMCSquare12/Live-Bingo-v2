@@ -10,9 +10,10 @@ const getPlayersWithRemaining = (room) => {
   const roomObj = room.toObject ? room.toObject() : room;
   if (roomObj.status === "playing") {
     roomObj.players.forEach((p) => {
-      if (!p.isHost) {
+      // Don't calculate remaining blocks for the host or spectators
+      if (!p.isHost && !p.isSpectator) {
         p.remaining = calculateRemaining(
-          p.markedIndices,
+          p.markedIndices || [],
           roomObj.winningPattern,
         );
       }
@@ -30,6 +31,7 @@ module.exports = (io, socket) => {
         socketId: socket.id,
         name: hostName,
         isHost: true,
+        isSpectator: false,
         cardMatrix: [],
         markedIndices: [12],
       };
@@ -68,11 +70,37 @@ module.exports = (io, socket) => {
       if (roomCheck.status === "playing") {
         socket.join(roomId);
 
-        const gameState = roomCheck.toObject();
+        let existingSpectator = roomCheck.players.find(
+          (p) => p.socketId === socket.id && p.isSpectator,
+        );
+        let updatedRoom = roomCheck;
+        let newPlayer;
+
+        // If not already in the DB as a spectator, add them!
+        if (!existingSpectator) {
+          newPlayer = {
+            socketId: socket.id,
+            name: playerName,
+            cardMatrix: [],
+            isHost: false,
+            isSpectator: true, // Mark them explicitly
+            markedIndices: [],
+          };
+
+          updatedRoom = await Room.findOneAndUpdate(
+            { roomId: roomId },
+            { $push: { players: newPlayer } },
+            { new: true },
+          );
+        } else {
+          newPlayer = existingSpectator;
+        }
+
+        const gameState = updatedRoom.toObject();
         gameState.players.forEach((p) => {
-          if (!p.isHost) {
+          if (!p.isHost && !p.isSpectator) {
             p.remaining = calculateRemaining(
-              p.markedIndices,
+              p.markedIndices || [],
               gameState.winningPattern,
             );
           }
@@ -81,23 +109,59 @@ module.exports = (io, socket) => {
         socket.emit("spectator_joined", {
           gameState: gameState,
           message: "Game in progress. You are spectating.",
+          player: newPlayer,
         });
+
+        // Tell the host and others to update their lists (Waiting list will show up)
+        io.to(roomId).emit(
+          "update_player_list",
+          getPlayersWithRemaining(updatedRoom),
+        );
         return;
       }
 
-      const newPlayer = {
-        socketId: socket.id,
-        name: playerName,
-        cardMatrix: generateBingoCard(),
-        isHost: false,
-        markedIndices: [12],
-      };
-
-      const updatedRoom = await Room.findOneAndUpdate(
-        { roomId: roomId, status: { $ne: "playing" } },
-        { $push: { players: newPlayer } },
-        { new: true },
+      // Check if joining player was a spectator trying to join a waiting room
+      const existingSpectator = roomCheck.players.find(
+        (p) => p.socketId === socket.id && p.isSpectator,
       );
+
+      let updatedRoom;
+      let newPlayer;
+
+      if (existingSpectator) {
+        // Upgrade spectator to player
+        newPlayer = existingSpectator;
+        newPlayer.isSpectator = false;
+        newPlayer.cardMatrix = generateBingoCard();
+        newPlayer.markedIndices = [12];
+
+        updatedRoom = await Room.findOneAndUpdate(
+          { roomId: roomId, "players.socketId": socket.id },
+          {
+            $set: {
+              "players.$.isSpectator": false,
+              "players.$.cardMatrix": newPlayer.cardMatrix,
+              "players.$.markedIndices": newPlayer.markedIndices,
+            },
+          },
+          { new: true },
+        );
+      } else {
+        newPlayer = {
+          socketId: socket.id,
+          name: playerName,
+          cardMatrix: generateBingoCard(),
+          isHost: false,
+          isSpectator: false,
+          markedIndices: [12],
+        };
+
+        updatedRoom = await Room.findOneAndUpdate(
+          { roomId: roomId, status: { $ne: "playing" } },
+          { $push: { players: newPlayer } },
+          { new: true },
+        );
+      }
 
       if (!updatedRoom) {
         return socket.emit(
@@ -108,9 +172,13 @@ module.exports = (io, socket) => {
 
       socket.join(roomId);
 
+      const joinedPlayer = updatedRoom.players.find(
+        (p) => p.socketId === socket.id,
+      );
+
       socket.emit("room_joined", {
         roomId,
-        player: newPlayer,
+        player: joinedPlayer,
         playersList: getPlayersWithRemaining(updatedRoom),
       });
 
@@ -160,9 +228,9 @@ module.exports = (io, socket) => {
 
         if (updatedRoom.status === "playing") {
           updatedRoom.players.forEach((p) => {
-            if (!p.isHost) {
+            if (!p.isHost && !p.isSpectator) {
               const remaining = calculateRemaining(
-                p.markedIndices,
+                p.markedIndices || [],
                 updatedRoom.winningPattern,
               );
               io.to(roomId).emit("update_player_progress", {
@@ -274,7 +342,7 @@ module.exports = (io, socket) => {
           }
 
           playersWithRemaining.forEach((p) => {
-            if (!p.isHost) {
+            if (!p.isHost && !p.isSpectator) {
               socket.emit("update_player_progress", {
                 playerId: p._id,
                 remaining: p.remaining,
@@ -304,7 +372,11 @@ module.exports = (io, socket) => {
       room.status = "playing";
 
       room.players.forEach((player) => {
-        if (player.cardMatrix.length === 0 && !player.isHost) {
+        if (
+          player.cardMatrix.length === 0 &&
+          !player.isHost &&
+          !player.isSpectator
+        ) {
           player.cardMatrix = generateBingoCard();
         }
       });
@@ -354,7 +426,7 @@ module.exports = (io, socket) => {
     if (!room) return;
 
     const player = room.players.find((p) => p.socketId === socket.id);
-    if (!player) return;
+    if (!player || player.isSpectator) return;
 
     if (!room.numbersDrawn.includes(number)) {
       return socket.emit("action_error", "That number hasn't been called yet!");
@@ -420,8 +492,10 @@ module.exports = (io, socket) => {
     // Remove the player
     room.players = room.players.filter((p) => p.socketId !== targetSocketId);
 
-    // Check remaining active players (excluding the host)
-    const activePlayers = room.players.filter((p) => !p.isHost);
+    // Check remaining active players (excluding the host and spectators)
+    const activePlayers = room.players.filter(
+      (p) => !p.isHost && !p.isSpectator,
+    );
     let gameWasReset = false;
 
     // If no players are left and the game was running, reset the game
@@ -432,7 +506,10 @@ module.exports = (io, socket) => {
       room.winners = [];
 
       room.players.forEach((p) => {
-        p.markedIndices = [12];
+        if (!p.isSpectator) {
+          p.markedIndices = [12];
+          p.cardMatrix = generateBingoCard();
+        }
       });
 
       gameWasReset = true;
@@ -511,8 +588,11 @@ module.exports = (io, socket) => {
     room.winners = [];
 
     room.players.forEach((p) => {
-      p.markedIndices = [12];
-      p.cardMatrix = generateBingoCard();
+      // Don't auto-generate cards for spectators yet. They will rejoin.
+      if (!p.isSpectator) {
+        p.markedIndices = [12];
+        p.cardMatrix = generateBingoCard();
+      }
     });
 
     await room.save();

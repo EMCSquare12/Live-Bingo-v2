@@ -6,6 +6,10 @@ const PlayerSchema = new mongoose.Schema({
   name: { type: String, required: true },
   cardMatrix: [[Number]], // 5x5 Grid
   isHost: { type: Boolean, default: false },
+
+  // NEW: Track if the player is spectating
+  isSpectator: { type: Boolean, default: false },
+
   // Track which indices (0-24) the player has marked
   markedIndices: { type: [Number], default: [] },
 });
