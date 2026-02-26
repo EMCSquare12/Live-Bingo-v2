@@ -277,10 +277,12 @@ const PlayerRoom = () => {
                 {player.name}
               </h1>
               <div className="flex flex-col md:flex-row md:items-center gap-0 md:gap-2 text-[11px] md:text-sm text-gray-400">
-                <span className="font-mono">Room: {room}</span>
+                <span className="font-mono rounded border border-gray-500 p-1">
+                  Room: {room}
+                </span>
                 <span className="hidden md:inline text-gray-600">•</span>
-                <span className="truncate max-w-30 md:max-w-xs">
-                  Host: {hostName}
+                <span className="truncate max-w-30 md:max-w-xs p-1 rounded-md border border-gray-500">
+                  Host: {hostName.toUpperCase()}
                 </span>
               </div>
             </div>

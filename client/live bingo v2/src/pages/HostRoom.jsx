@@ -271,14 +271,48 @@ const HostRoom = () => {
             <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-linear-to-r from-pink-500 to-yellow-500">
               {isSpectator ? "Spectator View" : "Host Panel"}
             </h1>
-            <div
-              onClick={handleCopyCode}
-              className="flex items-center gap-2 cursor-pointer hover:text-yellow-400 transition-colors"
-            >
-              <span className="font-mono text-xl tracking-widest text-gray-300">
-                CODE: {room}
+            <div className="flex flex-col md:flex-row md:items-center gap-0 md:gap-2 text-[11px] md:text-sm text-gray-400 mt-0.5">
+              <span className="font-mono p-1 border border-gray-500 rounded-md tracking-wider text-gray-400">
+                Host: {hostName?.toUpperCase()}
               </span>
-              <Copy size={16} />
+              <span className="hidden md:inline text-gray-600">•</span>
+
+              <div
+                onClick={handleCopyCode}
+                className="flex items-center p-1 rounded-md border border-gray-500 gap-1 cursor-pointer hover:text-yellow-400 transition-colors"
+                title="Copy Room Code"
+              >
+                <span className="font-mono  tracking-wider text-gray-400">
+                  CODE: {room}
+                </span>
+                <Copy size={12} className="md:w-4 md:h-4" />
+              </div>
+            </div>
+            {/* Winning Pattern Mini-Grid */}
+            <div className="flex flex-col items-center bg-gray-900/50 p-1 md:p-1.5 rounded-lg shrink-0">
+              <span className="text-[8px] md:text-[10px] text-gray-400 uppercase font-bold mb-0.5 tracking-wider">
+                Pattern
+              </span>
+              <div
+                className={`grid grid-cols-5 gap-[1px] w-7 h-7 md:w-10 md:h-10 border border-gray-700 bg-gray-800 p-[1px] rounded-sm ${!isSpectator && gameState === "waiting" ? "cursor-pointer hover:border-pink-500 transition-colors" : ""}`}
+                onClick={() =>
+                  !isSpectator &&
+                  gameState === "waiting" &&
+                  setShowSettings(!showSettings)
+                }
+                title={
+                  !isSpectator && gameState === "waiting"
+                    ? "Click to edit pattern"
+                    : "Winning pattern"
+                }
+              >
+                {Array.from({ length: 25 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`w-full h-full rounded-[1px] ${winningPattern?.includes(i) ? "bg-pink-500 shadow-[0_0_2px_#ec4899]" : "bg-gray-700/50"}`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
 
