@@ -379,7 +379,7 @@ const HostRoom = () => {
                   title="End Room"
                 >
                   <XCircle size={16} className="md:w-5 md:h-5" />
-                  <span className="hidden md:inline">End</span>
+                  <span>End</span>
                 </button>
               </>
             )}

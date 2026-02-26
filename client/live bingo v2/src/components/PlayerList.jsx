@@ -1,5 +1,14 @@
 import React, { useState } from "react";
-import { Trash2, User, Trophy, Eye, EyeOff } from "lucide-react";
+import {
+  Trash2,
+  User,
+  Trophy,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+} from "lucide-react";
 
 // Helper to get colors based on BINGO number affiliation
 const getNumberColorClasses = (num) => {
@@ -20,8 +29,11 @@ const PlayerList = ({
   // Store the IDs of players whose remaining numbers are currently visible
   const [viewedPlayers, setViewedPlayers] = useState(new Set());
 
+  // Toggle state for the waiting list
+  const [showWaitingList, setShowWaitingList] = useState(false);
+
   const activePlayers = players.filter((p) => !p.isSpectator);
-  const spectators = players.filter((p) => p.isSpectator);
+  const waitingPlayers = players.filter((p) => p.isSpectator);
 
   // Sort players to put winners at the top
   const sortedActivePlayers = [...activePlayers].sort((a, b) => {
@@ -78,34 +90,53 @@ const PlayerList = ({
   };
 
   return (
-    // FIX: Added `overflow-hidden w-full` to prevent the container from blowing out screen height
     <div className="bg-gray-800 flex flex-col h-full w-full overflow-hidden">
-      {/* Spectator Section */}
-      {spectators.length > 0 && (
+      {/* Waiting List Section (Spectators) */}
+      {waitingPlayers.length > 0 && (
         <div className="p-4 border-b border-gray-700 bg-gray-900 shrink-0">
-          <h2 className="text-sm font-bold text-gray-400 flex items-center gap-2 mb-3 uppercase tracking-wider">
-            <Eye size={16} />
-            Spectators ({spectators.length})
-          </h2>
-          <div className="flex flex-col gap-2 max-h-32 md:max-h-40 overflow-y-auto pr-1">
-            {spectators.map((s) => (
-              <div
-                key={s.socketId || s.id}
-                className="flex items-center justify-between p-2 rounded-lg bg-gray-800 border border-gray-700"
-              >
-                <span className="text-sm text-gray-300 truncate">{s.name}</span>
-                {onKick && (
-                  <button
-                    onClick={() => onKick(s.socketId)}
-                    className="text-gray-500 hover:text-red-500 transition-colors"
-                    title="Kick Spectator"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+          <button
+            onClick={() => setShowWaitingList(!showWaitingList)}
+            className="w-full flex items-center justify-between text-sm font-bold text-gray-400 hover:text-white transition-colors uppercase tracking-wider"
+            title={showWaitingList ? "Hide Waiting List" : "Show Waiting List"}
+          >
+            <div className="flex items-center gap-2">
+              <Clock
+                size={16}
+                className={showWaitingList ? "text-pink-500" : ""}
+              />
+              Waiting List ({waitingPlayers.length})
+            </div>
+            {showWaitingList ? (
+              <ChevronDown size={16} />
+            ) : (
+              <ChevronRight size={16} />
+            )}
+          </button>
+
+          {/* Toggleable List */}
+          {showWaitingList && (
+            <div className="flex flex-col gap-2 mt-3 max-h-32 md:max-h-40 overflow-y-auto pr-1">
+              {waitingPlayers.map((s) => (
+                <div
+                  key={s.socketId || s.id}
+                  className="flex items-center justify-between p-2 rounded-lg bg-gray-800 border border-gray-700"
+                >
+                  <span className="text-sm text-gray-300 truncate">
+                    {s.name}
+                  </span>
+                  {onKick && (
+                    <button
+                      onClick={() => onKick(s.socketId)}
+                      className="text-gray-500 hover:text-red-500 transition-colors"
+                      title="Kick Player"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -117,7 +148,7 @@ const PlayerList = ({
         </h2>
       </div>
 
-      {/* Active Players List - flex-1 allows this to take remaining space and independently scroll! */}
+      {/* Active Players List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2 pb-24 md:pb-4">
         {sortedActivePlayers.length === 0 && (
           <p className="text-gray-500 text-center mt-10">
