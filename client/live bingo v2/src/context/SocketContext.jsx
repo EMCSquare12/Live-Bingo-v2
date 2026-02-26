@@ -39,8 +39,12 @@ export const SocketProvider = ({ children }) => {
   }, [player, room]);
 
   useEffect(() => {
-    const newSocket = io("http://localhost:5000");
-    setSocket(newSocket);
+    const URL =
+      process.env.NODE_ENV === "production"
+        ? import.meta.env.VITE_BACKEND_URL
+        : "http://localhost:5000";
+
+    const socket = io(URL);
 
     newSocket.on("connect", () => {
       setIsConnected(true);
