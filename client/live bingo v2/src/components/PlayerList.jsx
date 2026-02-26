@@ -23,6 +23,27 @@ const PlayerList = ({
   const activePlayers = players.filter((p) => !p.isSpectator);
   const spectators = players.filter((p) => p.isSpectator);
 
+  // Sort players to put winners at the top
+  const sortedActivePlayers = [...activePlayers].sort((a, b) => {
+    const aIndex = winners.indexOf(a.name);
+    const bIndex = winners.indexOf(b.name);
+
+    const aIsWinner = aIndex !== -1;
+    const bIsWinner = bIndex !== -1;
+
+    // If both are winners, keep them in order of who won first
+    if (aIsWinner && bIsWinner) {
+      return aIndex - bIndex;
+    }
+    // Put winner 'a' before non-winner 'b'
+    if (aIsWinner) return -1;
+    // Put winner 'b' before non-winner 'a'
+    if (bIsWinner) return 1;
+
+    // If neither won, leave them in their original order
+    return 0;
+  });
+
   const toggleView = (id) => {
     setViewedPlayers((prev) => {
       const newSet = new Set(prev);
@@ -34,7 +55,7 @@ const PlayerList = ({
 
   const getRankText = (name) => {
     const index = winners.indexOf(name);
-    if (index === 0) return "1st BINGO! 🥇";
+    if (index === 0) return "1st BINGO! 🏆";
     if (index === 1) return "2nd Place 🥈";
     if (index === 2) return "3rd Place 🥉";
     return `${index + 1}th Place 🏅`;
@@ -60,7 +81,7 @@ const PlayerList = ({
         const col = index % 5;
         return player.cardMatrix[row][col];
       })
-      .filter((num) => num !== 0 && num !== null) // Ignore center free space if it's in the pattern
+      .filter((num) => num !== 0 && num !== null)
       .sort((a, b) => a - b);
   };
 
@@ -105,13 +126,14 @@ const PlayerList = ({
 
       {/* Active Players List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
-        {activePlayers.length === 0 && (
+        {sortedActivePlayers.length === 0 && (
           <p className="text-gray-500 text-center mt-10">
             Waiting for players to join...
           </p>
         )}
 
-        {activePlayers.map((p) => {
+        {/* --- NOW MAPPING OVER THE SORTED ARRAY --- */}
+        {sortedActivePlayers.map((p) => {
           const isWinner = winners.includes(p.name);
           const isViewed = viewedPlayers.has(p.socketId || p.id);
           const remainingNums = isViewed ? getRemainingNumbers(p) : [];
@@ -119,9 +141,9 @@ const PlayerList = ({
           return (
             <div
               key={p.socketId || p.id}
-              className={`flex items-center justify-between p-3 rounded-lg border ${
+              className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-500 ${
                 isWinner
-                  ? "bg-yellow-900/30 border-yellow-500"
+                  ? "bg-yellow-900/30 border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
                   : "bg-gray-700 border-gray-600"
               }`}
             >
@@ -167,7 +189,9 @@ const PlayerList = ({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p
+                    className={`text-xs mt-1 ${isWinner ? "text-yellow-400 font-bold animate-pulse" : "text-gray-400"}`}
+                  >
                     {gameStarted && !isWinner
                       ? `${p.remaining !== undefined ? p.remaining : 24} to win`
                       : gameStarted && isWinner

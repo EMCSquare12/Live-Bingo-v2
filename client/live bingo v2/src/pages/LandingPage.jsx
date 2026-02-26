@@ -87,7 +87,7 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-700">
-        <h1 className="text-4xl font-extrabold text-center mb-2 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-500">
+        <h1 className="text-4xl font-extrabold text-center mb-2 text-transparent bg-clip-text bg-linear-to-r from-pink-500 to-yellow-500">
           Live Bingo
         </h1>
         <p className="text-center text-gray-400 mb-8">

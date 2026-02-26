@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Copy, XCircle, Play, Settings, LogOut } from "lucide-react";
+import { Copy, XCircle, Play, Settings, LogOut, Users, X } from "lucide-react";
 import toast from "react-hot-toast";
 import PlayerList from "../components/PlayerList";
 import PatternPicker from "../components/PatternPicker";
@@ -40,7 +40,23 @@ const getBingoHeaderColor = (letter) => {
       return "text-gray-400";
   }
 };
-// -----------------------------------------
+
+const getBallColorTheme = (num, isRolling) => {
+  // Default state when rolling or no number
+  if (!num || isRolling) {
+    return "bg-gradient-to-br from-pink-600 to-purple-700 shadow-[0_0_20px_rgba(236,72,153,0.5)]";
+  }
+  // Color coded by letter
+  if (num <= 15)
+    return "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_20px_rgba(239,68,68,0.6)]"; // B
+  if (num <= 30)
+    return "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.6)]"; // I
+  if (num <= 45)
+    return "bg-gradient-to-br from-green-500 to-green-700 shadow-[0_0_20px_rgba(34,197,94,0.6)]"; // N
+  if (num <= 60)
+    return "bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.6)]"; // G
+  return "bg-gradient-to-br from-purple-500 to-purple-700 shadow-[0_0_20px_rgba(168,85,247,0.6)]"; // O
+};
 
 const HostRoom = () => {
   const { socket, room, player, disconnectSocket, setPlayer } = useSocket();
@@ -71,8 +87,15 @@ const HostRoom = () => {
     [];
   const [winningPattern, setWinningPattern] = useState(initialPattern);
 
+  const [hostName, setHostName] = useState(
+    location.state?.gameState?.players?.find((p) => p.isHost)?.name ||
+      player?.name ||
+      "Host",
+  );
+
   const [isRolling, setIsRolling] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showPlayersSidebar, setShowPlayersSidebar] = useState(false);
 
   useEffect(() => {
     if (!socket) return;
@@ -245,7 +268,7 @@ const HostRoom = () => {
       <div className="flex-1 flex flex-col p-4 md:p-8 relative overflow-y-auto">
         <div className="flex justify-between items-center mb-8 bg-gray-800 p-4 rounded-xl shadow-lg">
           <div>
-            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500">
+            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-linear-to-r from-pink-500 to-yellow-500">
               {isSpectator ? "Spectator View" : "Host Panel"}
             </h1>
             <div
@@ -260,6 +283,18 @@ const HostRoom = () => {
           </div>
 
           <div className="flex gap-2">
+            <button
+              onClick={() => setShowPlayersSidebar(true)}
+              className="md:hidden p-2 bg-gray-700 hover:bg-gray-600 rounded-lg relative"
+              title="Show Players"
+            >
+              <Users size={20} />
+              {players.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  {players.length}
+                </span>
+              )}
+            </button>
             {!isSpectator && gameState === "waiting" && (
               <button
                 onClick={() => setShowSettings(!showSettings)}
@@ -315,23 +350,21 @@ const HostRoom = () => {
           </>
         )}
 
-        <div className="flex-1 flex flex-col items-center justify-center gap-8 min-h-[400px]">
+        <div className="flex-1 flex flex-col items-center justify-center gap-8 min-h-100">
           <div
             className={`
-            w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2
-            bg-gradient-to-br from-blue-600 to-purple-700 shadow-[0_0_30px_rgba(59,130,246,0.5)]
+            w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2 text-white
             border-4 border-white transition-all duration-300 transform
             ${isRolling ? "animate-bounce scale-110" : "scale-100"}
+            ${getBallColorTheme(currentNumber, isRolling)}
           `}
           >
             {currentNumber && !isRolling && (
-              <span
-                className={`text-6xl font-black -mb-4 drop-shadow-md ${getBingoHeaderColor(getBingoLetter(currentNumber))}`}
-              >
+              <span className="text-6xl font-black -mb-4 drop-shadow-md text-white/90">
                 {getBingoLetter(currentNumber)}
               </span>
             )}
-            <span className="text-8xl font-black text-white drop-shadow-md z-10">
+            <span className="text-8xl font-black drop-shadow-md z-10">
               {currentNumber || "--"}
             </span>
           </div>
@@ -404,13 +437,37 @@ const HostRoom = () => {
         </div>
       </div>
 
-      <PlayerList
-        players={players}
-        onKick={isSpectator ? null : handleKick}
-        winners={winners}
-        gameStarted={gameState === "playing"}
-        winningPattern={winningPattern}
-      />
+      {showPlayersSidebar && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setShowPlayersSidebar(false)}
+        />
+      )}
+
+      {/* Sidebar Wrapper */}
+      <div
+        className={`
+          fixed inset-y-0 right-0 z-50 w-80 h-full shadow-2xl transform transition-transform duration-300 ease-in-out
+          md:static md:translate-x-0 md:w-auto md:h-full md:shadow-none md:z-auto
+          ${showPlayersSidebar ? "translate-x-0" : "translate-x-full"}
+        `}
+      >
+        {/* Mobile Close Button */}
+        <button
+          onClick={() => setShowPlayersSidebar(false)}
+          className="md:hidden absolute top-4 right-4 z-60 p-2 bg-gray-800 text-gray-300 hover:text-white rounded-lg shadow-md border border-gray-700"
+        >
+          <X size={18} />
+        </button>
+
+        <PlayerList
+          players={players}
+          onKick={isSpectator ? null : handleKick}
+          winners={winners}
+          gameStarted={gameState === "playing"}
+          winningPattern={winningPattern}
+        />
+      </div>
     </div>
   );
 };

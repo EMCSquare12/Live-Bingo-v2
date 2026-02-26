@@ -16,6 +16,23 @@ const getBingoLetter = (num) => {
   return "O";
 };
 
+const getBallColorTheme = (num, isRolling) => {
+  // Default state when rolling or no number
+  if (!num || isRolling) {
+    return "bg-gradient-to-br from-pink-600 to-purple-700 shadow-[0_0_20px_rgba(236,72,153,0.5)]";
+  }
+  // Color coded by letter
+  if (num <= 15)
+    return "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_20px_rgba(239,68,68,0.6)]"; // B
+  if (num <= 30)
+    return "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.6)]"; // I
+  if (num <= 45)
+    return "bg-gradient-to-br from-green-500 to-green-700 shadow-[0_0_20px_rgba(34,197,94,0.6)]"; // N
+  if (num <= 60)
+    return "bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.6)]"; // G
+  return "bg-gradient-to-br from-purple-500 to-purple-700 shadow-[0_0_20px_rgba(168,85,247,0.6)]"; // O
+};
+
 const getBingoColorClasses = (num) => {
   if (num <= 15) return "bg-red-900/50 text-red-200 border-red-700"; // B
   if (num <= 30) return "bg-yellow-900/50 text-yellow-200 border-yellow-700"; // I
@@ -63,6 +80,10 @@ const PlayerRoom = () => {
     location.state?.gameState?.winningPattern || [],
   );
 
+  const [hostName, setHostName] = useState(
+    location.state?.gameState?.players?.find((p) => p.isHost)?.name || "Host",
+  );
+
   const [cardMatrix, setCardMatrix] = useState(player?.cardMatrix || []);
   const [markedIndices, setMarkedIndices] = useState(
     player?.markedIndices || [12],
@@ -91,12 +112,15 @@ const PlayerRoom = () => {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("game_started", ({ winners: initialWinners }) => {
-      setGameState("playing");
-      if (initialWinners) setWinners(initialWinners);
-      if (serverPattern) setWinningPattern(serverPattern);
-      toast.success("Game Started! Good luck!");
-    });
+    socket.on(
+      "game_started",
+      ({ winners: initialWinners, winningPattern: serverPattern }) => {
+        setGameState("playing");
+        if (initialWinners) setWinners(initialWinners);
+        if (serverPattern) setWinningPattern(serverPattern);
+        toast.success("Game Started! Good luck!");
+      },
+    );
 
     socket.on("number_rolled", ({ number, history: newHistory }) => {
       setIsRolling(true);
@@ -106,7 +130,7 @@ const PlayerRoom = () => {
       const interval = setInterval(() => {
         setCurrentNumber(Math.floor(Math.random() * 75) + 1);
         i++;
-        if (i > 5) {
+        if (i > 10) {
           clearInterval(interval);
           setIsRolling(false);
           setCurrentNumber(number);
@@ -168,6 +192,9 @@ const PlayerRoom = () => {
       setHasBingo(false);
       setShowConfetti(false);
       setIsRolling(false);
+
+      const currentHost = updatedPlayers.find((p) => p.isHost);
+      if (currentHost) setHostName(currentHost.name);
 
       const me = updatedPlayers.find((p) => p.socketId === socket.id);
       if (me) {
@@ -238,16 +265,44 @@ const PlayerRoom = () => {
   });
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-hidden">
+    <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-[auto_1fr] h-screen bg-gray-900 text-white overflow-y-auto md:overflow-hidden">
       {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
 
-      {/* Left Panel - Game Info & History */}
-      <div className="flex-1 flex flex-col p-4 md:p-8 relative overflow-y-auto order-2 md:order-1">
+      {/* Part A: Header, Game Info & Actions (Order 1 on Mobile) */}
+      <div className="flex flex-col p-4 md:p-8 md:pb-4 order-1 md:col-start-1 md:row-start-1">
         <div className="flex justify-between items-center mb-6 bg-gray-800 p-4 rounded-xl shadow-lg">
-          <div>
-            <h1 className="text-2xl font-bold text-pink-500">{player.name}</h1>
-            <p className="font-mono text-sm text-gray-400">Room: {room}</p>
+          <div className="flex items-center gap-3 md:gap-6">
+            <div>
+              <h1 className="text-lg md:text-2xl font-bold text-pink-500 truncate max-w-30 md:max-w-xs">
+                {player.name}
+              </h1>
+              <div className="flex flex-col md:flex-row md:items-center gap-0 md:gap-2 text-[11px] md:text-sm text-gray-400">
+                <span className="font-mono">Room: {room}</span>
+                <span className="hidden md:inline text-gray-600">•</span>
+                <span className="truncate max-w-30 md:max-w-xs">
+                  Host: {hostName}
+                </span>
+              </div>
+            </div>
+
+            {/* Winning Pattern Mini-Grid */}
+            {winningPattern?.length > 0 && (
+              <div className="flex flex-col items-center bg-gray-900/50 p-1 md:p-1.5 rounded-lg">
+                <span className="text-[8px] md:text-[10px] text-gray-400 uppercase font-bold mb-0.5 tracking-wider">
+                  Pattern
+                </span>
+                <div className="grid grid-cols-5 gap-px w-7 h-7 md:w-10 md:h-10 border border-gray-700 bg-gray-800 p-px rounded-sm">
+                  {Array.from({ length: 25 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-full h-full rounded-[1px] ${winningPattern.includes(i) ? "bg-pink-500 shadow-[0_0_2px_#ec4899]" : "bg-gray-700/50"}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
           <button
             onClick={handleLeaveRoom}
             className="p-2 text-gray-400 hover:text-red-500 bg-gray-700 hover:bg-red-900/20 rounded-lg transition-colors"
@@ -261,56 +316,67 @@ const PlayerRoom = () => {
         <div className="mb-8 flex justify-center">
           <div
             className={`
-            w-32 h-32 rounded-full flex flex-col items-center justify-center gap-1
-            bg-gradient-to-br from-pink-600 to-purple-700 shadow-[0_0_20px_rgba(236,72,153,0.5)]
+            w-32 h-32 rounded-full flex flex-col items-center justify-center gap-1 text-white
             border-4 border-white transition-all duration-300 transform
             ${isRolling ? "animate-bounce scale-110" : "scale-100"}
+            ${getBallColorTheme(currentNumber, isRolling)}
           `}
           >
             {currentNumber && !isRolling && (
-              <span
-                className={`text-4xl font-black -mb-2 drop-shadow-md ${getBingoHeaderColor(getBingoLetter(currentNumber))}`}
-              >
+              <span className="text-4xl font-black -mb-2 drop-shadow-md text-white/90">
                 {getBingoLetter(currentNumber)}
               </span>
             )}
-            <span className="text-6xl font-black text-white drop-shadow-md">
+            <span className="text-6xl font-black drop-shadow-md">
               {currentNumber || "--"}
             </span>
           </div>
         </div>
+      </div>
 
-        {/* Actions */}
-        <div className="flex justify-center gap-4 mb-8">
-          {gameState === "waiting" && (
-            <button
-              onClick={handleShuffle}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-500 font-bold rounded-full shadow-lg transition-colors"
-            >
-              Shuffle Card 🔄
-            </button>
-          )}
+      {/* Part B: Bingo Card (Order 2 on Mobile) */}
+      <div className="bg-gray-900 p-4 py-8 md:p-8 flex items-center justify-center order-2 md:col-start-2 md:row-start-1 md:row-span-2 border-y md:border-y-0 md:border-l border-gray-700">
+        <div className="w-full max-w-xl aspect-square flex flex-col gap-4 relative">
+          <BingoCard
+            matrix={cardMatrix}
+            markedIndices={markedIndices}
+            onCellClick={handleCellClick}
+            winningPattern={winningPattern}
+          />
 
-          {gameState === "playing" && (
-            <button
-              onClick={handleClaimBingo}
-              disabled={!hasBingo || winners.includes(player.name)}
-              className={`
-                px-8 py-3 text-2xl font-black rounded-full shadow-lg transition-all
+          <div className="w-full max-w-md mx-auto flex justify-center gap-4 mb-4 md:mb-0">
+            {gameState === "waiting" && (
+              <button
+                onClick={handleShuffle}
+                className="px-6 py-4 w-full bg-blue-600 hover:bg-blue-500 font-bold rounded-full shadow-lg transition-colors"
+              >
+                Shuffle Card
+              </button>
+            )}
+
+            {gameState === "playing" && (
+              <button
+                onClick={handleClaimBingo}
+                disabled={!hasBingo || winners.includes(player.name)}
+                className={`
+                px-8 py-4 w-full text-2xl font-black rounded-full shadow-lg transition-all
                 ${
                   hasBingo && !winners.includes(player.name)
-                    ? "bg-gradient-to-r from-yellow-400 to-orange-500 hover:scale-105 animate-pulse text-gray-900"
+                    ? "bg-linear-to-r from-yellow-400 to-orange-500 hover:scale-105 animate-pulse text-gray-900"
                     : "bg-gray-700 text-gray-500 cursor-not-allowed"
                 }
               `}
-            >
-              BINGO! 🎉
-            </button>
-          )}
+              >
+                BINGO! 🎉
+              </button>
+            )}
+          </div>
         </div>
+      </div>
 
-        {/* Call History with Color Coding */}
-        <div className="mt-auto bg-gray-800 p-4 rounded-xl w-full">
+      {/* Part C: Call History (Order 3 on Mobile) */}
+      <div className="flex flex-col p-4 md:p-8 md:pt-0 order-3 md:col-start-1 md:row-start-2 md:overflow-y-auto">
+        <div className="md:mt-auto bg-gray-800 p-4 rounded-xl w-full">
           <h3 className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-wide border-b border-gray-700 pb-2">
             Call History
           </h3>
@@ -340,18 +406,6 @@ const PlayerRoom = () => {
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* Right Panel - Bingo Card */}
-      <div className="flex-1 bg-gray-900 p-4 md:p-8 flex items-center justify-center order-1 md:order-2 border-b md:border-b-0 md:border-l border-gray-700">
-        <div className="w-full max-w-xl aspect-square relative">
-          <BingoCard
-            matrix={cardMatrix}
-            markedIndices={markedIndices}
-            onCellClick={handleCellClick}
-            winningPattern={winningPattern}
-          />
         </div>
       </div>
     </div>
