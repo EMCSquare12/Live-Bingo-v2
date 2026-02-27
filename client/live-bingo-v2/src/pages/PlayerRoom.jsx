@@ -17,28 +17,26 @@ const getBingoLetter = (num) => {
 };
 
 const getBallColorTheme = (num, isRolling) => {
-  // Default state when rolling or no number
   if (!num || isRolling) {
     return "bg-gradient-to-br from-pink-600 to-purple-700 shadow-[0_0_20px_rgba(236,72,153,0.5)]";
   }
-  // Color coded by letter
   if (num <= 15)
-    return "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_20px_rgba(239,68,68,0.6)]"; // B
+    return "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_20px_rgba(239,68,68,0.6)]";
   if (num <= 30)
-    return "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.6)]"; // I
+    return "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.6)]";
   if (num <= 45)
-    return "bg-gradient-to-br from-green-500 to-green-700 shadow-[0_0_20px_rgba(34,197,94,0.6)]"; // N
+    return "bg-gradient-to-br from-green-500 to-green-700 shadow-[0_0_20px_rgba(34,197,94,0.6)]";
   if (num <= 60)
-    return "bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.6)]"; // G
-  return "bg-gradient-to-br from-purple-500 to-purple-700 shadow-[0_0_20px_rgba(168,85,247,0.6)]"; // O
+    return "bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.6)]";
+  return "bg-gradient-to-br from-purple-500 to-purple-700 shadow-[0_0_20px_rgba(168,85,247,0.6)]";
 };
 
 const getBingoColorClasses = (num) => {
-  if (num <= 15) return "bg-red-900/50 text-red-200 border-red-700"; // B
-  if (num <= 30) return "bg-yellow-900/50 text-yellow-200 border-yellow-700"; // I
-  if (num <= 45) return "bg-green-900/50 text-green-200 border-green-700"; // N
-  if (num <= 60) return "bg-blue-900/50 text-blue-200 border-blue-700"; // G
-  return "bg-purple-900/50 text-purple-200 border-purple-700"; // O
+  if (num <= 15) return "bg-red-900/50 text-red-200 border-red-700";
+  if (num <= 30) return "bg-yellow-900/50 text-yellow-200 border-yellow-700";
+  if (num <= 45) return "bg-green-900/50 text-green-200 border-green-700";
+  if (num <= 60) return "bg-blue-900/50 text-blue-200 border-blue-700";
+  return "bg-purple-900/50 text-purple-200 border-purple-700";
 };
 
 const getBingoHeaderColor = (letter) => {
@@ -103,9 +101,7 @@ const PlayerRoom = () => {
 
   useEffect(() => {
     if (gameState === "playing" && winningPattern?.length > 0) {
-      if (checkWinCondition(markedIndices)) {
-        setHasBingo(true);
-      }
+      if (checkWinCondition(markedIndices)) setHasBingo(true);
     }
   }, [markedIndices, winningPattern, gameState, checkWinCondition]);
 
@@ -124,8 +120,6 @@ const PlayerRoom = () => {
 
     socket.on("number_rolled", ({ number, history: newHistory }) => {
       setIsRolling(true);
-
-      // Small animation for rolling number
       let i = 0;
       const interval = setInterval(() => {
         setCurrentNumber(Math.floor(Math.random() * 75) + 1);
@@ -154,20 +148,15 @@ const PlayerRoom = () => {
       });
     });
 
-    socket.on("action_error", (msg) => {
-      toast.error(msg);
-    });
+    socket.on("action_error", (msg) => toast.error(msg));
 
     socket.on("player_won", ({ winner, winners: updatedWinners, rank }) => {
       if (updatedWinners) setWinners(updatedWinners);
       const suffix =
         rank === 1 ? "st" : rank === 2 ? "nd" : rank === 3 ? "rd" : "th";
-
       if (winner === player.name) {
         setShowConfetti(true);
-        toast.success(`You won ${rank}${suffix} place! 🔥`, {
-          duration: 8000,
-        });
+        toast.success(`You won ${rank}${suffix} place! 🔥`, { duration: 8000 });
         setTimeout(() => setShowConfetti(false), 8000);
       } else {
         toast(`${winner} got BINGO! (${rank}${suffix})`, { icon: "🎊" });
@@ -228,22 +217,18 @@ const PlayerRoom = () => {
   }, [socket, navigate, player.name, setPlayer, checkWinCondition]);
 
   const handleCellClick = (index, num) => {
-    if (gameState !== "playing") return;
-    if (index === 12) return;
-
+    if (gameState !== "playing" || index === 12) return;
     socket.emit("mark_number", { roomId: room, number: num, cellIndex: index });
   };
 
   const handleClaimBingo = () => {
     if (hasBingo) {
       socket.emit("claim_bingo", { roomId: room });
-      setHasBingo(false); // Prevent spamming
+      setHasBingo(false);
     }
   };
 
-  const handleShuffle = () => {
-    socket.emit("request_shuffle", { roomId: room });
-  };
+  const handleShuffle = () => socket.emit("request_shuffle", { roomId: room });
 
   const handleLeaveRoom = () => {
     if (
@@ -260,18 +245,18 @@ const PlayerRoom = () => {
   };
 
   const groupedHistory = { B: [], I: [], N: [], G: [], O: [] };
-  history.forEach((num) => {
-    groupedHistory[getBingoLetter(num)].push(num);
-  });
+  history.forEach((num) => groupedHistory[getBingoLetter(num)].push(num));
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-y-auto md:overflow-hidden pb-24 md:pb-0">
       {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
 
-      {/* Left Column: Rolling Number & Call History Container */}
-      <div className="flex flex-col flex-1 order-1 md:overflow-y-auto">
-        {/* Part A: Header, Game Info & Actions */}
-        <div className="flex flex-col p-4 md:p-8 md:pb-4 shrink-0">
+      {/* LEFT DESKTOP COLUMN 
+        Using `contents md:flex` so mobile ignores this wrapper and orders children directly.
+      */}
+      <div className="contents md:flex md:flex-col md:flex-1 md:order-1 md:overflow-y-auto md:no-scrollbar">
+        {/* Part A: Header, Game Info & Actions (Order 1 on Mobile) */}
+        <div className="flex flex-col p-4 md:p-8 md:pb-4 shrink-0 order-1 md:order-none">
           <div className="flex justify-between items-center mb-6 bg-gray-800 p-4 rounded-xl shadow-lg">
             <div className="flex items-center gap-3 md:gap-6">
               <div className="min-w-0 flex flex-col gap-2">
@@ -338,8 +323,8 @@ const PlayerRoom = () => {
           </div>
         </div>
 
-        {/* Part C: Call History (Scrolling with the left side) */}
-        <div className="flex flex-col p-4 md:p-8 md:pt-0 shrink-0">
+        {/* Part C: Call History (Order 3 on Mobile) */}
+        <div className="flex flex-col p-4 md:p-8 md:pt-0 shrink-0 order-3 md:order-none">
           <div className="md:mt-auto bg-gray-800 p-4 rounded-xl w-full">
             <h3 className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-wide border-b border-gray-700 pb-2">
               Call History
@@ -374,43 +359,48 @@ const PlayerRoom = () => {
         </div>
       </div>
 
-      {/* Right Column: Bingo Card Container */}
-      <div className="bg-gray-900 p-4 py-8 md:p-8 flex flex-col items-center order-2 flex-1 md:overflow-y-auto border-y md:border-y-0 md:border-l border-gray-700">
-        <div className="w-full max-w-xl aspect-square flex flex-col gap-4 relative md:my-auto">
-          <BingoCard
-            matrix={cardMatrix}
-            markedIndices={markedIndices}
-            onCellClick={handleCellClick}
-            winningPattern={winningPattern}
-          />
+      {/* RIGHT DESKTOP COLUMN 
+        Using `contents md:flex` here too, so on mobile it sits right between order-1 and order-3
+      */}
+      <div className="contents md:flex md:flex-col md:flex-1 md:order-2 md:overflow-y-auto md:border-l border-gray-700">
+        {/* Part B: Bingo Card (Order 2 on Mobile) */}
+        <div className="bg-gray-900 p-4 py-8 md:p-8 flex flex-col items-center flex-1 order-2 md:order-none md:my-auto border-y md:border-y-0 border-gray-700">
+          <div className="w-full max-w-xl aspect-square flex flex-col gap-4 relative">
+            <BingoCard
+              matrix={cardMatrix}
+              markedIndices={markedIndices}
+              onCellClick={handleCellClick}
+              winningPattern={winningPattern}
+            />
 
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 z-50 md:static md:bg-transparent md:border-none md:p-0 md:mt-2 md:backdrop-blur-none shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.5)] md:shadow-none">
-            <div className="w-full max-w-md mx-auto flex justify-center gap-4">
-              {gameState === "waiting" && (
-                <button
-                  onClick={handleShuffle}
-                  className="px-6 py-4 w-full bg-blue-600 hover:bg-blue-500 font-bold rounded-md shadow-lg transition-colors"
-                >
-                  Shuffle Card
-                </button>
-              )}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 z-50 md:static md:bg-transparent md:border-none md:p-0 md:mt-2 md:backdrop-blur-none shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.5)] md:shadow-none">
+              <div className="w-full max-w-md mx-auto flex justify-center gap-4">
+                {gameState === "waiting" && (
+                  <button
+                    onClick={handleShuffle}
+                    className="px-6 py-4 w-full bg-blue-600 hover:bg-blue-500 font-bold rounded-md shadow-lg transition-colors"
+                  >
+                    Shuffle Card
+                  </button>
+                )}
 
-              {gameState === "playing" && (
-                <button
-                  onClick={handleClaimBingo}
-                  disabled={!hasBingo || winners.includes(player.name)}
-                  className={`
-                  px-8 py-4 w-full text-2xl font-black rounded-md shadow-lg transition-all
-                  ${
-                    hasBingo && !winners.includes(player.name)
-                      ? "bg-gradient-to-r from-yellow-400 to-orange-500 hover:scale-105 animate-pulse text-gray-900"
-                      : "bg-gray-700 text-gray-500 cursor-not-allowed"
-                  }
-                `}
-                >
-                  BINGO! 🔥
-                </button>
-              )}
+                {gameState === "playing" && (
+                  <button
+                    onClick={handleClaimBingo}
+                    disabled={!hasBingo || winners.includes(player.name)}
+                    className={`
+                    px-8 py-4 w-full text-2xl font-black rounded-md shadow-lg transition-all
+                    ${
+                      hasBingo && !winners.includes(player.name)
+                        ? "bg-gradient-to-r from-yellow-400 to-orange-500 hover:scale-105 animate-pulse text-gray-900"
+                        : "bg-gray-700 text-gray-500 cursor-not-allowed"
+                    }
+                  `}
+                  >
+                    BINGO! 🔥
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
