@@ -44,9 +44,11 @@ export const SocketProvider = ({ children }) => {
         ? import.meta.env.VITE_BACKEND_URL
         : "http://localhost:5000";
 
-    const socket = io(URL);
+    const newSocket = io(URL);
 
-    socket.on("connect", () => {
+    setSocket(newSocket);
+
+    newSocket.on("connect", () => {
       setIsConnected(true);
 
       // 3. Ask server to rejoin if we have data (Page Reload)
@@ -61,21 +63,21 @@ export const SocketProvider = ({ children }) => {
       }
     });
 
-    socket.on("disconnect", () => setIsConnected(false));
+    newSocket.on("disconnect", () => setIsConnected(false));
 
     // Listeners for initial room entry
-    socket.on("room_joined", ({ roomId, player }) => {
+    newSocket.on("room_joined", ({ roomId, player }) => {
       setRoom(roomId);
       setPlayer(player);
     });
 
     // 4. IMPORTANT: Listen for Host creation so the Host saves their session!
-    socket.on("room_created", ({ roomId, player }) => {
+    newSocket.on("room_created", ({ roomId, player }) => {
       setRoom(roomId);
       setPlayer(player);
     });
 
-    return () => socket.close();
+    return () => newSocket.close();
   }, []);
 
   const disconnectSocket = () => {
