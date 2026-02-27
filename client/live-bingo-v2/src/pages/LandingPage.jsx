@@ -42,7 +42,10 @@ const LandingPage = () => {
       navigate("/spectate", { state: { gameState } });
     });
 
-    socket.on("error", (msg) => toast.error(msg));
+    socket.on("error", (msg) => {
+      toast.dismiss();
+      toast.error(msg);
+    });
 
     return () => {
       socket.off("room_created");
@@ -60,9 +63,14 @@ const LandingPage = () => {
   const handleCreate = (e) => {
     e.preventDefault();
     if (!socket) return toast.error("Server not connected...");
-    if (!formData.username) return toast.error("Name is required");
-    if (formData.winningPattern.length === 0)
+    if (!formData.username) {
+      toast.dismiss();
+      return toast.error("Name is required");
+    }
+    if (formData.winningPattern.length === 0) {
+      toast.dismiss();
       return toast.error("Select at least 1 winning cell");
+    }
 
     if (!socket.connected) socket.connect();
     socket.emit("create_room", {
@@ -74,8 +82,10 @@ const LandingPage = () => {
   const handleJoin = (e) => {
     e.preventDefault();
     if (!socket) return toast.error("Server not connected...");
-    if (!formData.username || !formData.roomCode)
+    if (!formData.username || !formData.roomCode) {
+      toast.dismiss();
       return toast.error("Fill all fields");
+    }
 
     if (!socket.connected) socket.connect();
     socket.emit("join_room", {

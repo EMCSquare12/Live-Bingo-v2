@@ -151,7 +151,10 @@ const PlayerRoom = () => {
       });
     });
 
-    socket.on("action_error", (msg) => toast.error(msg));
+    socket.on("action_error", (msg) => {
+      toast.dismiss();
+      return toast.error(msg);
+    });
 
     socket.on("player_won", ({ winner, winners: updatedWinners, rank }) => {
       if (updatedWinners) setWinners(updatedWinners);
