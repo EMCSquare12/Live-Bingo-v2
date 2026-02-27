@@ -56,7 +56,7 @@ export const SocketProvider = ({ children }) => {
       const savedPlayer = sessionStorage.getItem("player");
 
       if (savedRoom && savedPlayer) {
-        socket.emit("rejoin_room", {
+        newSocket.emit("rejoin_room", {
           roomId: savedRoom,
           player: JSON.parse(savedPlayer),
         });
