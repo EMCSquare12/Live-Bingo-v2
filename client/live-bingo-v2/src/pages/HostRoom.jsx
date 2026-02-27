@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useSocket } from "../context/SocketContext";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Copy, XCircle, Play, Settings, LogOut, Users, X } from "lucide-react";
+import {
+  Copy,
+  XCircle,
+  Play,
+  Settings,
+  LogOut,
+  Users,
+  X,
+  Menu,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import PlayerList from "../components/PlayerList";
 import PatternPicker from "../components/PatternPicker";
@@ -17,11 +26,11 @@ const getBingoLetter = (num) => {
 };
 
 const getBingoColorClasses = (num) => {
-  if (num <= 15) return "bg-red-900/50 text-red-200 border-red-700"; // B
-  if (num <= 30) return "bg-yellow-900/50 text-yellow-200 border-yellow-700"; // I
-  if (num <= 45) return "bg-green-900/50 text-green-200 border-green-700"; // N
-  if (num <= 60) return "bg-blue-900/50 text-blue-200 border-blue-700"; // G
-  return "bg-purple-900/50 text-purple-200 border-purple-700"; // O
+  if (num <= 15) return "bg-red-900/50 text-red-200 border-red-700";
+  if (num <= 30) return "bg-yellow-900/50 text-yellow-200 border-yellow-700";
+  if (num <= 45) return "bg-green-900/50 text-green-200 border-green-700";
+  if (num <= 60) return "bg-blue-900/50 text-blue-200 border-blue-700";
+  return "bg-purple-900/50 text-purple-200 border-purple-700";
 };
 
 const getBingoHeaderColor = (letter) => {
@@ -42,20 +51,17 @@ const getBingoHeaderColor = (letter) => {
 };
 
 const getBallColorTheme = (num, isRolling) => {
-  // Default state when rolling or no number
-  if (!num || isRolling) {
+  if (!num || isRolling)
     return "bg-gradient-to-br from-pink-600 to-purple-700 shadow-[0_0_20px_rgba(236,72,153,0.5)]";
-  }
-  // Color coded by letter
   if (num <= 15)
-    return "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_20px_rgba(239,68,68,0.6)]"; // B
+    return "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_20px_rgba(239,68,68,0.6)]";
   if (num <= 30)
-    return "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.6)]"; // I
+    return "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.6)]";
   if (num <= 45)
-    return "bg-gradient-to-br from-green-500 to-green-700 shadow-[0_0_20px_rgba(34,197,94,0.6)]"; // N
+    return "bg-gradient-to-br from-green-500 to-green-700 shadow-[0_0_20px_rgba(34,197,94,0.6)]";
   if (num <= 60)
-    return "bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.6)]"; // G
-  return "bg-gradient-to-br from-purple-500 to-purple-700 shadow-[0_0_20px_rgba(168,85,247,0.6)]"; // O
+    return "bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.6)]";
+  return "bg-gradient-to-br from-purple-500 to-purple-700 shadow-[0_0_20px_rgba(168,85,247,0.6)]";
 };
 
 const HostRoom = () => {
@@ -97,19 +103,19 @@ const HostRoom = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showPlayersSidebar, setShowPlayersSidebar] = useState(false);
 
+  // NEW: State for Mobile Header Sidebar
+  const [showMenuSidebar, setShowMenuSidebar] = useState(false);
+
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("player_left", (msg) => {
-      toast(msg, { icon: "👋" });
-    });
+    socket.on("player_left", (msg) => toast(msg, { icon: "👋" }));
 
     socket.on("game_reset", ({ message, players: updatedPlayers }) => {
       if (isSpectator) {
         socket.emit("join_room", { roomId: room, playerName: player?.name });
         return;
       }
-
       setGameState("waiting");
       setHistory([]);
       setCurrentNumber(null);
@@ -139,7 +145,6 @@ const HostRoom = () => {
 
     socket.on("number_rolled", ({ number, history: newHistory }) => {
       setIsRolling(true);
-
       let i = 0;
       const interval = setInterval(() => {
         setCurrentNumber(Math.floor(Math.random() * 75) + 1);
@@ -203,12 +208,9 @@ const HostRoom = () => {
     const handleKeyDown = (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        if (gameState === "playing" && !isRolling && !isSpectator) {
-          handleRoll();
-        }
+        if (gameState === "playing" && !isRolling && !isSpectator) handleRoll();
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [gameState, isRolling, room, isSpectator]);
@@ -246,9 +248,7 @@ const HostRoom = () => {
   };
 
   const handleCloseRoom = () => {
-    if (confirm("Close room for everyone?")) {
-      disconnectSocket();
-    }
+    if (confirm("Close room for everyone?")) disconnectSocket();
   };
 
   const handleLeaveAsSpectator = () => {
@@ -259,13 +259,11 @@ const HostRoom = () => {
   };
 
   const groupedHistory = { B: [], I: [], N: [], G: [], O: [] };
-  history.forEach((num) => {
-    groupedHistory[getBingoLetter(num)].push(num);
-  });
+  history.forEach((num) => groupedHistory[getBingoLetter(num)].push(num));
 
   return (
     <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-y-auto md:overflow-hidden">
-      {/* Mobile Overlay for Sidebar */}
+      {/* Mobile Overlay for Right Players Sidebar */}
       {showPlayersSidebar && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
@@ -277,44 +275,91 @@ const HostRoom = () => {
       <div className="flex flex-col flex-1 order-1 min-w-0 md:overflow-y-auto">
         {/* Part A: Header & Roll Info */}
         <div className="flex flex-col p-4 md:p-8 md:pb-4 shrink-0">
-          {/* Responsive Header */}
-          <div className="flex justify-between items-center mb-6 md:mb-8 bg-gray-800 p-3 md:p-4 rounded-xl shadow-lg">
-            <div className="flex items-center gap-3 md:gap-6 min-w-0">
+          {/* --- MOBILE TOP BAR --- */}
+          <div className="md:hidden flex justify-between items-center bg-gray-800 p-3 rounded-xl mb-6 shadow-lg">
+            <button
+              onClick={() => setShowMenuSidebar(true)}
+              className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            >
+              <Menu size={20} />
+            </button>
+            <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500 truncate px-2">
+              {isSpectator ? "Spectator View" : "Host Panel"}
+            </h1>
+            <button
+              onClick={() => setShowPlayersSidebar(true)}
+              className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg relative flex items-center justify-center transition-colors"
+            >
+              <Users size={20} />
+              {players.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
+                  {players.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* --- RESPONSIVE HEADER / SIDEBAR --- */}
+          {/* Mobile Overlay for Menu */}
+          {showMenuSidebar && (
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              onClick={() => setShowMenuSidebar(false)}
+            />
+          )}
+
+          <div
+            className={`
+            fixed inset-y-0 left-0 z-50 w-72 bg-gray-800 p-6 shadow-2xl flex flex-col gap-6 transform transition-transform duration-300 overflow-y-auto
+            md:static md:w-auto md:bg-gray-800 md:p-4 md:rounded-xl md:flex-row md:justify-between md:items-center md:translate-x-0 md:mb-8 md:z-auto md:shadow-lg md:overflow-visible
+            ${showMenuSidebar ? "translate-x-0" : "-translate-x-full"}
+          `}
+          >
+            {/* Mobile Menu Close Button */}
+            <button
+              onClick={() => setShowMenuSidebar(false)}
+              className="md:hidden absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X size={24} />
+            </button>
+
+            <div className="flex flex-col md:flex-row md:items-center gap-6 mt-8 md:mt-0 min-w-0">
               <div className="min-w-0 flex flex-col gap-2">
-                <h1 className="text-lg md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500 truncate">
+                <h1 className="hidden md:block text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500 truncate">
                   {isSpectator ? "Spectator View" : "Host Panel"}
                 </h1>
 
-                <div className="flex flex-col md:flex-row md:items-center md:gap-2 text-[11px] md:text-sm text-gray-400 mt-0.5">
-                  <span className="font-mono rounded-md border border-gray-500 p-1 tracking-wider text-gray-400">
+                <div className="flex flex-col md:flex-row md:items-center gap-2 text-sm text-gray-400 mt-0.5">
+                  <span className="font-mono rounded-md border border-gray-500 p-1.5 md:p-1 tracking-wider w-fit">
                     Host: {hostName.toUpperCase()}
                   </span>
                   <span className="hidden md:inline text-gray-600">•</span>
                   <div
                     onClick={handleCopyCode}
-                    className="flex items-center gap-1 cursor-pointer rounded-md border border-gray-500 p-1 hover:text-yellow-400 transition-colors"
+                    className="flex items-center gap-2 cursor-pointer rounded-md border border-gray-500 p-1.5 md:p-1 hover:text-yellow-400 transition-colors w-fit"
                     title="Copy Room Code"
                   >
-                    <span className="font-mono tracking-wider text-gray-400">
+                    <span className="font-mono tracking-wider">
                       CODE: {room}
                     </span>
-                    <Copy size={12} className="md:w-4 md:h-4" />
+                    <Copy size={14} className="md:w-4 md:h-4" />
                   </div>
                 </div>
               </div>
 
               {/* Winning Pattern Mini-Grid */}
-              <div className="flex flex-col items-center bg-gray-900/50 p-1 md:p-1.5 rounded-lg shrink-0">
-                <span className="text-[8px] md:text-[10px] text-gray-400 uppercase font-bold mb-0.5 tracking-wider">
+              <div className="flex flex-col items-start md:items-center bg-gray-900/50 p-3 md:p-1.5 rounded-lg shrink-0 w-fit">
+                <span className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">
                   Pattern
                 </span>
                 <div
-                  className={`grid grid-cols-5 gap-[1px] w-7 h-7 md:w-10 md:h-10 border border-gray-700 bg-gray-800 p-[1px] rounded-sm ${!isSpectator && gameState === "waiting" ? "cursor-pointer hover:border-pink-500 transition-colors" : ""}`}
-                  onClick={() =>
-                    !isSpectator &&
-                    gameState === "waiting" &&
-                    setShowSettings(!showSettings)
-                  }
+                  className={`grid grid-cols-5 gap-[1px] w-10 h-10 border border-gray-700 bg-gray-800 p-[1px] rounded-sm ${!isSpectator && gameState === "waiting" ? "cursor-pointer hover:border-pink-500 transition-colors" : ""}`}
+                  onClick={() => {
+                    if (!isSpectator && gameState === "waiting") {
+                      setShowSettings(!showSettings);
+                      setShowMenuSidebar(false); // Close sidebar on mobile when editing pattern
+                    }
+                  }}
                   title={
                     !isSpectator && gameState === "waiting"
                       ? "Click to edit pattern"
@@ -332,71 +377,78 @@ const HostRoom = () => {
             </div>
 
             {/* Action Buttons Container */}
-            <div className="flex gap-1.5 md:gap-2 shrink-0 ml-2">
-              {/* Mobile Players Toggle Button */}
-              <button
-                onClick={() => setShowPlayersSidebar(true)}
-                className="md:hidden p-2 bg-gray-700 hover:bg-gray-600 rounded-lg relative flex items-center justify-center"
-                title="Show Players"
-              >
-                <Users size={16} />
-                {players.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-pink-600 text-white text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
-                    {players.length}
-                  </span>
-                )}
-              </button>
-
+            <div className="flex flex-col md:flex-row gap-3 mt-auto md:mt-0 shrink-0">
+              {/* Desktop Edit Pattern Button */}
               {!isSpectator && gameState === "waiting" && (
                 <button
                   onClick={() => setShowSettings(!showSettings)}
-                  className="hidden md:flex p-2 md:px-3 md:py-2 bg-gray-700 hover:bg-gray-600 rounded-lg items-center gap-2"
+                  className="hidden md:flex px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg items-center gap-2 transition-colors"
                   title="Edit Pattern"
                 >
                   <Settings size={18} />
                 </button>
               )}
 
+              {/* Mobile Edit Pattern Button */}
+              {!isSpectator && gameState === "waiting" && (
+                <button
+                  onClick={() => {
+                    setShowSettings(!showSettings);
+                    setShowMenuSidebar(false);
+                  }}
+                  className="md:hidden flex p-3 bg-gray-700 hover:bg-gray-600 rounded-lg items-center justify-center gap-2 font-bold w-full transition-colors"
+                >
+                  <Settings size={18} /> Edit Pattern
+                </button>
+              )}
+
               {isSpectator ? (
                 <button
                   onClick={handleLeaveAsSpectator}
-                  className="p-2 md:px-4 md:py-2 bg-red-900/50 hover:bg-red-900 rounded-lg flex items-center justify-center gap-2 font-bold text-sm"
+                  className="p-3 md:px-4 md:py-2 bg-red-900/50 hover:bg-red-900 rounded-lg flex items-center justify-center gap-2 font-bold text-sm w-full md:w-auto transition-colors"
                 >
                   <LogOut size={16} className="md:w-5 md:h-5" />
-                  <span className="hidden md:inline">Leave</span>
+                  <span>Leave</span>
                 </button>
               ) : (
                 <>
                   <button
                     onClick={handleRestart}
-                    className="p-2 md:px-4 md:py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center gap-2 font-bold text-sm"
+                    className="p-3 md:px-4 md:py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center gap-2 font-bold text-sm w-full md:w-auto transition-colors"
                     title="New Game"
                   >
-                    <span className="hidden md:inline">New Game</span>
-                    <span className="md:hidden">New</span>
+                    <span>New Game</span>
                   </button>
                   <button
                     onClick={handleCloseRoom}
-                    className="p-2 md:px-4 md:py-2 bg-red-600 hover:bg-red-700 rounded-lg flex items-center justify-center gap-2 font-bold text-sm"
+                    className="p-3 md:px-4 md:py-2 bg-red-600 hover:bg-red-700 rounded-lg flex items-center justify-center gap-2 font-bold text-sm w-full md:w-auto transition-colors"
                     title="End Room"
                   >
                     <XCircle size={16} className="md:w-5 md:h-5" />
-                    <span>End</span>
+                    <span>End Room</span>
                   </button>
                 </>
               )}
             </div>
           </div>
 
-          {/* Pattern Editor Modal */}
+          {/* Pattern Editor Modal (Centered overlay) */}
           {showSettings && !isSpectator && (
             <>
               <div
-                className="fixed inset-0 z-40"
+                className="fixed inset-0 bg-black/60 z-[60]"
                 onClick={() => setShowSettings(false)}
               />
-              <div className="absolute top-24 right-8 z-50 bg-gray-800 p-4 border border-gray-600 rounded-xl shadow-2xl">
-                <h3 className="font-bold mb-2">Edit Pattern</h3>
+              <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[70] bg-gray-800 p-6 border border-gray-600 rounded-xl shadow-2xl w-[90%] max-w-sm">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-xl">Edit Pattern</h3>
+                  <button
+                    onClick={() => setShowSettings(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
                 <PatternPicker
                   initialPattern={winningPattern}
                   onPatternChange={(p) => {

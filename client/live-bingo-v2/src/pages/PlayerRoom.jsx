@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import BingoCard from "../components/BingoCard";
 import Confetti from "react-confetti";
 import toast from "react-hot-toast";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 
 // --- Helper functions for color coding ---
 const getBingoLetter = (num) => {
@@ -17,18 +17,17 @@ const getBingoLetter = (num) => {
 };
 
 const getBallColorTheme = (num, isRolling) => {
-  if (!num || isRolling) {
+  if (!num || isRolling)
     return "bg-gradient-to-br from-pink-600 to-purple-700 shadow-[0_0_20px_rgba(236,72,153,0.5)]";
-  }
   if (num <= 15)
-    return "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_20px_rgba(239,68,68,0.6)]";
+    return "bg-gradient-to-br from-red-500 to-red-700 shadow-[0_0_20px_rgba(239,68,68,0.6)]"; // B
   if (num <= 30)
-    return "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.6)]";
+    return "bg-gradient-to-br from-yellow-400 to-orange-500 shadow-[0_0_20px_rgba(245,158,11,0.6)]"; // I
   if (num <= 45)
-    return "bg-gradient-to-br from-green-500 to-green-700 shadow-[0_0_20px_rgba(34,197,94,0.6)]";
+    return "bg-gradient-to-br from-green-500 to-green-700 shadow-[0_0_20px_rgba(34,197,94,0.6)]"; // N
   if (num <= 60)
-    return "bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.6)]";
-  return "bg-gradient-to-br from-purple-500 to-purple-700 shadow-[0_0_20px_rgba(168,85,247,0.6)]";
+    return "bg-gradient-to-br from-blue-500 to-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.6)]"; // G
+  return "bg-gradient-to-br from-purple-500 to-purple-700 shadow-[0_0_20px_rgba(168,85,247,0.6)]"; // O
 };
 
 const getBingoColorClasses = (num) => {
@@ -81,7 +80,6 @@ const PlayerRoom = () => {
   const [hostName, setHostName] = useState(
     location.state?.gameState?.players?.find((p) => p.isHost)?.name || "Host",
   );
-
   const [cardMatrix, setCardMatrix] = useState(player?.cardMatrix || []);
   const [markedIndices, setMarkedIndices] = useState(
     player?.markedIndices || [12],
@@ -90,6 +88,9 @@ const PlayerRoom = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [hasBingo, setHasBingo] = useState(false);
   const [isRolling, setIsRolling] = useState(false);
+
+  // NEW: State for Mobile Sidebar Header
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   const checkWinCondition = useCallback(
     (indices) => {
@@ -251,24 +252,64 @@ const PlayerRoom = () => {
     <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-y-auto md:overflow-hidden pb-24 md:pb-0">
       {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
 
-      {/* LEFT DESKTOP COLUMN 
-        Using `contents md:flex` so mobile ignores this wrapper and orders children directly.
-      */}
+      {/* LEFT DESKTOP COLUMN */}
       <div className="contents md:flex md:flex-col md:flex-1 md:order-1 md:overflow-y-auto md:no-scrollbar">
         {/* Part A: Header, Game Info & Actions (Order 1 on Mobile) */}
         <div className="flex flex-col p-4 md:p-8 md:pb-4 shrink-0 order-1 md:order-none">
-          <div className="flex justify-between items-center mb-6 bg-gray-800 p-4 rounded-xl shadow-lg">
-            <div className="flex items-center gap-3 md:gap-6">
+          {/* --- MOBILE TOP BAR --- */}
+          <div className="md:hidden flex justify-between items-center mb-6 bg-gray-800 p-3 rounded-xl shadow-lg">
+            <button
+              onClick={() => setShowMobileSidebar(true)}
+              className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            >
+              <Menu size={20} />
+            </button>
+            <h1 className="text-lg font-bold text-pink-500 truncate max-w-[150px]">
+              {player.name}
+            </h1>
+            <button
+              onClick={handleLeaveRoom}
+              className="p-2 text-gray-400 hover:text-red-500 bg-gray-700 hover:bg-red-900/20 rounded-lg transition-colors"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
+
+          {/* --- RESPONSIVE HEADER / SIDEBAR --- */}
+          {/* Mobile Overlay */}
+          {showMobileSidebar && (
+            <div
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              onClick={() => setShowMobileSidebar(false)}
+            />
+          )}
+
+          <div
+            className={`
+            fixed inset-y-0 left-0 z-50 w-72 bg-gray-800 p-6 shadow-2xl flex flex-col gap-6 transform transition-transform duration-300 overflow-y-auto
+            md:static md:w-auto md:bg-gray-800 md:p-4 md:rounded-xl md:flex-row md:justify-between md:items-center md:translate-x-0 md:mb-6 md:z-auto md:shadow-lg md:overflow-visible
+            ${showMobileSidebar ? "translate-x-0" : "-translate-x-full"}
+          `}
+          >
+            {/* Mobile Sidebar Close Button */}
+            <button
+              onClick={() => setShowMobileSidebar(false)}
+              className="md:hidden absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X size={24} />
+            </button>
+
+            <div className="flex flex-col md:flex-row md:items-center gap-6 mt-8 md:mt-0">
               <div className="min-w-0 flex flex-col gap-2">
-                <h1 className="text-lg md:text-2xl font-bold text-pink-500 truncate max-w-30 md:max-w-xs">
+                <h1 className="hidden md:block text-2xl font-bold text-pink-500 truncate max-w-xs">
                   {player.name}
                 </h1>
-                <div className="flex flex-col md:flex-row md:items-center gap-0 md:gap-2 text-[11px] md:text-sm text-gray-400">
-                  <span className="font-mono rounded border border-gray-500 p-1">
+                <div className="flex flex-col md:flex-row md:items-center gap-2 text-sm text-gray-400">
+                  <span className="font-mono rounded border border-gray-500 p-1.5 md:p-1 w-fit">
                     Room: {room}
                   </span>
                   <span className="hidden md:inline text-gray-600">•</span>
-                  <span className="truncate max-w-30 md:max-w-xs p-1 rounded-md border border-gray-500">
+                  <span className="truncate max-w-xs p-1.5 md:p-1 rounded-md border border-gray-500 w-fit">
                     Host: {hostName.toUpperCase()}
                   </span>
                 </div>
@@ -276,11 +317,11 @@ const PlayerRoom = () => {
 
               {/* Winning Pattern Mini-Grid */}
               {winningPattern?.length > 0 && (
-                <div className="flex flex-col items-center bg-gray-900/50 p-1 md:p-1.5 rounded-lg">
-                  <span className="text-[8px] md:text-[10px] text-gray-400 uppercase font-bold mb-0.5 tracking-wider">
+                <div className="flex flex-col items-start md:items-center bg-gray-900/50 p-3 md:p-1.5 rounded-lg w-fit">
+                  <span className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">
                     Pattern
                   </span>
-                  <div className="grid grid-cols-5 gap-px w-7 h-7 md:w-10 md:h-10 border border-gray-700 bg-gray-800 p-px rounded-sm">
+                  <div className="grid grid-cols-5 gap-px w-10 h-10 md:w-10 md:h-10 border border-gray-700 bg-gray-800 p-px rounded-sm">
                     {Array.from({ length: 25 }).map((_, i) => (
                       <div
                         key={i}
@@ -292,12 +333,21 @@ const PlayerRoom = () => {
               )}
             </div>
 
+            {/* Desktop Leave Button */}
             <button
               onClick={handleLeaveRoom}
-              className="p-2 text-gray-400 hover:text-red-500 bg-gray-700 hover:bg-red-900/20 rounded-lg transition-colors"
+              className="hidden md:flex p-2 text-gray-400 hover:text-red-500 bg-gray-700 hover:bg-red-900/20 rounded-lg transition-colors"
               title="Leave Room"
             >
               <LogOut size={20} />
+            </button>
+
+            {/* Mobile Leave Button at bottom of sidebar */}
+            <button
+              onClick={handleLeaveRoom}
+              className="md:hidden mt-auto flex items-center justify-center gap-2 p-3 bg-red-900/50 hover:bg-red-900 text-white font-bold rounded-lg transition-colors w-full"
+            >
+              <LogOut size={20} /> Leave Room
             </button>
           </div>
 
@@ -359,9 +409,7 @@ const PlayerRoom = () => {
         </div>
       </div>
 
-      {/* RIGHT DESKTOP COLUMN 
-        Using `contents md:flex` here too, so on mobile it sits right between order-1 and order-3
-      */}
+      {/* RIGHT DESKTOP COLUMN */}
       <div className="contents md:flex md:flex-col md:flex-1 md:order-2 md:overflow-y-auto md:border-l border-gray-700">
         {/* Part B: Bingo Card (Order 2 on Mobile) */}
         <div className="bg-gray-900 p-4 py-8 md:p-8 flex flex-col items-center flex-1 order-2 md:order-none md:my-auto border-y md:border-y-0 border-gray-700">
