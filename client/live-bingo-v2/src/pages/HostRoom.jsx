@@ -111,9 +111,13 @@ const HostRoom = () => {
   useEffect(() => {
     if (!socket) return;
 
+    let rollInterval;
+
     socket.on("player_left", (msg) => toast(msg, { icon: "👋" }));
 
     socket.on("game_reset", ({ message, players: updatedPlayers }) => {
+      clearInterval(rollInterval);
+
       if (isSpectator) {
         socket.emit("join_room", { roomId: room, playerName: player?.name });
         return;
@@ -148,11 +152,14 @@ const HostRoom = () => {
     socket.on("number_rolled", ({ number, history: newHistory }) => {
       setIsRolling(true);
       let i = 0;
-      const interval = setInterval(() => {
+
+      clearInterval(rollInterval);
+
+      rollInterval = setInterval(() => {
         setCurrentNumber(Math.floor(Math.random() * 75) + 1);
         i++;
         if (i > 10) {
-          clearInterval(interval);
+          clearInterval(rollInterval);
           setIsRolling(false);
           setCurrentNumber(number);
           setHistory(newHistory);
@@ -194,6 +201,7 @@ const HostRoom = () => {
     });
 
     return () => {
+      clearInterval(rollInterval);
       socket.off("player_left");
       socket.off("update_player_list");
       socket.off("game_started");

@@ -109,6 +109,8 @@ const PlayerRoom = () => {
   useEffect(() => {
     if (!socket) return;
 
+    let rollInterval;
+
     socket.on(
       "game_started",
       ({ winners: initialWinners, winningPattern: serverPattern }) => {
@@ -123,17 +125,20 @@ const PlayerRoom = () => {
     socket.on("number_rolled", ({ number, history: newHistory }) => {
       setIsRolling(true);
       let i = 0;
-      const interval = setInterval(() => {
+
+      clearInterval(rollInterval);
+
+      rollInterval = setInterval(() => {
         setCurrentNumber(Math.floor(Math.random() * 75) + 1);
         i++;
         if (i > 10) {
-          clearInterval(interval);
+          clearInterval(rollInterval);
           setIsRolling(false);
           setCurrentNumber(number);
           setHistory(newHistory);
           toast.dismiss();
           toast(`Number drawn: ${getBingoLetter(number)} ${number}`, {
-            icon: "🎱",
+            icon: "🎟️",
             duration: 3000,
           });
         }
@@ -181,6 +186,7 @@ const PlayerRoom = () => {
     });
 
     socket.on("game_reset", ({ message, players: updatedPlayers }) => {
+      clearInterval(rollInterval);
       setGameState("waiting");
       setHistory([]);
       setCurrentNumber(null);
@@ -213,6 +219,7 @@ const PlayerRoom = () => {
     });
 
     return () => {
+      clearInterval(rollInterval);
       socket.off("game_started");
       socket.off("number_rolled");
       socket.off("mark_success");
