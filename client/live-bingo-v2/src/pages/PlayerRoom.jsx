@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import BingoCard from "../components/BingoCard";
 import Confetti from "react-confetti";
 import toast from "react-hot-toast";
-import { LogOut, Menu, X } from "lucide-react";
+import { LogOut, Menu, X, Hash, User } from "lucide-react";
 
 // --- Helper functions for color coding ---
 const getBingoLetter = (num) => {
@@ -89,7 +89,7 @@ const PlayerRoom = () => {
   const [hasBingo, setHasBingo] = useState(false);
   const [isRolling, setIsRolling] = useState(false);
 
-  // NEW: State for Mobile Sidebar Header
+  // State for Mobile Sidebar Header
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
   const checkWinCondition = useCallback(
@@ -115,6 +115,7 @@ const PlayerRoom = () => {
         setGameState("playing");
         if (initialWinners) setWinners(initialWinners);
         if (serverPattern) setWinningPattern(serverPattern);
+        toast.dismiss();
         toast.success("Game Started! Good luck!");
       },
     );
@@ -130,8 +131,9 @@ const PlayerRoom = () => {
           setIsRolling(false);
           setCurrentNumber(number);
           setHistory(newHistory);
+          toast.dismiss();
           toast(`Number drawn: ${getBingoLetter(number)} ${number}`, {
-            icon: "🎉",
+            icon: "🎱",
             duration: 3000,
           });
         }
@@ -143,7 +145,7 @@ const PlayerRoom = () => {
         const newIndices = [...prev, cellIndex];
         if (checkWinCondition(newIndices)) {
           setHasBingo(true);
-          toast.success("BINGO! Claim your win now!", { icon: "🔥" });
+          toast.success("BINGO! Claim your win now!", { icon: "🎉" });
         }
         return newIndices;
       });
@@ -157,18 +159,20 @@ const PlayerRoom = () => {
         rank === 1 ? "st" : rank === 2 ? "nd" : rank === 3 ? "rd" : "th";
       if (winner === player.name) {
         setShowConfetti(true);
-        toast.success(`You won ${rank}${suffix} place! 🔥`, { duration: 8000 });
+        toast.success(`You won ${rank}${suffix} place! 🎉`, { duration: 8000 });
         setTimeout(() => setShowConfetti(false), 8000);
       } else {
-        toast(`${winner} got BINGO! (${rank}${suffix})`, { icon: "🎊" });
+        toast(`${winner} got BINGO! (${rank}${suffix})`, { icon: "🏆" });
       }
     });
 
     socket.on("false_bingo", ({ name }) => {
       if (name === player.name) {
+        toast.dismiss();
         toast.error("False ! Check your card.");
         setHasBingo(false);
       } else {
+        toast.dismiss();
         toast(`${name} called a false BINGO! 🤡`);
       }
     });
@@ -196,6 +200,7 @@ const PlayerRoom = () => {
 
     socket.on("card_shuffled", (newMatrix) => {
       setCardMatrix(newMatrix);
+      toast.dismiss();
       toast.success("Card shuffled!");
     });
 
@@ -269,9 +274,9 @@ const PlayerRoom = () => {
             </h1>
             <button
               onClick={handleLeaveRoom}
-              className="p-2 text-gray-400 hover:text-red-500 bg-gray-700 hover:bg-red-900/20 rounded-lg transition-colors"
+              className="p-2 text-gray-400 hover:text-red-500 bg-gray-700 hover:bg-red-900/50 rounded-lg transition-colors"
             >
-              <LogOut size={20} />
+              <LogOut title="Leave Room" size={20} />
             </button>
           </div>
 
@@ -279,53 +284,76 @@ const PlayerRoom = () => {
           {/* Mobile Overlay */}
           {showMobileSidebar && (
             <div
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
               onClick={() => setShowMobileSidebar(false)}
             />
           )}
 
           <div
             className={`
-            fixed inset-y-0 left-0 z-50 w-72 bg-gray-800 p-6 shadow-2xl flex flex-col gap-6 transform transition-transform duration-300 overflow-y-auto
-            md:static md:w-auto md:bg-gray-800 md:p-4 md:rounded-xl md:flex-row md:justify-between md:items-center md:translate-x-0 md:mb-6 md:z-auto md:shadow-lg md:overflow-visible
+            fixed inset-y-0 left-0 z-50 w-80 bg-gray-900/95 backdrop-blur-xl shadow-2xl flex flex-col transform transition-transform duration-300 overflow-hidden border-r border-gray-800
+            md:static md:w-auto md:bg-gray-800 md:p-4 md:rounded-xl md:flex-row md:justify-between md:items-center md:translate-x-0 md:mb-6 md:z-auto md:shadow-lg md:overflow-visible md:border-none md:backdrop-blur-none
             ${showMobileSidebar ? "translate-x-0" : "-translate-x-full"}
           `}
           >
-            {/* Mobile Sidebar Close Button */}
-            <button
-              onClick={() => setShowMobileSidebar(false)}
-              className="md:hidden absolute top-4 right-4 text-gray-400 hover:text-white"
-            >
-              <X size={24} />
-            </button>
+            {/* Mobile Sidebar Header */}
+            <div className="md:hidden flex items-center justify-between p-5 border-b border-gray-800 bg-gray-800/30">
+              <h2 className="text-xl font-black text-pink-500 truncate pr-4">
+                {player.name}
+              </h2>
+              <button
+                onClick={() => setShowMobileSidebar(false)}
+                className="p-2 bg-gray-800 text-gray-400 hover:text-white rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-            <div className="flex flex-col md:flex-row md:items-center gap-6 mt-8 md:mt-0">
+            {/* Sidebar Content */}
+            <div className="flex flex-col md:flex-row md:items-center gap-6 p-6 md:p-0 overflow-y-auto md:overflow-visible flex-1">
               <div className="min-w-0 flex flex-col gap-2">
                 <h1 className="hidden md:block text-2xl font-bold text-pink-500 truncate max-w-xs">
                   {player.name}
                 </h1>
-                <div className="flex flex-col md:flex-row md:items-center gap-2 text-sm text-gray-400">
-                  <span className="font-mono rounded border border-gray-500 p-1.5 md:p-1 w-fit">
-                    Room: {room}
-                  </span>
-                  <span className="hidden md:inline text-gray-600">•</span>
-                  <span className="truncate max-w-xs p-1.5 md:p-1 rounded-md border border-gray-500 w-fit">
-                    Host: {hostName.toUpperCase()}
-                  </span>
+
+                {/* Mobile Info Card / Desktop Inline */}
+                <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-2 text-sm text-gray-300 bg-gray-800/40 p-4 md:p-0 rounded-xl md:bg-transparent md:rounded-none border border-gray-700/50 md:border-none">
+                  <div className="flex items-center gap-2">
+                    <Hash size={16} className="text-gray-500 md:hidden" />
+                    <span className="md:hidden text-xs uppercase tracking-wider font-bold text-gray-500 w-12">
+                      Room
+                    </span>
+                    <span className="font-mono bg-gray-900 md:bg-transparent px-2 py-1 md:p-0 rounded border border-gray-700 md:border-gray-500 md:border md:p-1 w-fit text-white md:text-gray-400">
+                      {room}
+                    </span>
+                  </div>
+
+                  <div className="hidden md:block text-gray-600">•</div>
+                  <div className="md:hidden w-full h-px bg-gray-700/50 my-1"></div>
+
+                  <div className="flex items-center gap-2">
+                    <User size={16} className="text-gray-500 md:hidden" />
+                    <span className="md:hidden text-xs uppercase tracking-wider font-bold text-gray-500 w-12">
+                      Host
+                    </span>
+                    <span className="truncate max-w-xs bg-gray-900 md:bg-transparent px-2 py-1 md:p-0 rounded border border-gray-700 md:border-gray-500 md:border md:p-1 w-fit text-white md:text-gray-400">
+                      {hostName.toUpperCase()}
+                    </span>
+                  </div>
                 </div>
               </div>
 
               {/* Winning Pattern Mini-Grid */}
               {winningPattern?.length > 0 && (
-                <div className="flex flex-col items-start md:items-center bg-gray-900/50 p-3 md:p-1.5 rounded-lg w-fit">
-                  <span className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">
-                    Pattern
+                <div className="flex flex-col items-start md:items-center bg-gray-800/40 md:bg-gray-900/50 p-5 md:p-1.5 rounded-xl md:rounded-lg border border-gray-700/50 md:border-none w-full md:w-fit">
+                  <span className="text-xs md:text-[10px] text-gray-400 uppercase font-bold mb-3 md:mb-1 tracking-wider">
+                    Winning Pattern
                   </span>
-                  <div className="grid grid-cols-5 gap-px w-10 h-10 md:w-10 md:h-10 border border-gray-700 bg-gray-800 p-px rounded-sm">
+                  <div className="grid grid-cols-5 gap-px w-20 h-20 md:w-10 md:h-10 border border-gray-600 bg-gray-700 p-px rounded-sm mx-auto md:mx-0">
                     {Array.from({ length: 25 }).map((_, i) => (
                       <div
                         key={i}
-                        className={`w-full h-full rounded-[1px] ${winningPattern.includes(i) ? "bg-pink-500 shadow-[0_0_2px_#ec4899]" : "bg-gray-700/50"}`}
+                        className={`w-full h-full rounded-[1px] ${winningPattern.includes(i) ? "bg-pink-500 shadow-[0_0_2px_#ec4899]" : "bg-gray-800/80"}`}
                       />
                     ))}
                   </div>
@@ -343,12 +371,14 @@ const PlayerRoom = () => {
             </button>
 
             {/* Mobile Leave Button at bottom of sidebar */}
-            <button
-              onClick={handleLeaveRoom}
-              className="md:hidden mt-auto flex items-center justify-center gap-2 p-3 bg-red-900/50 hover:bg-red-900 text-white font-bold rounded-lg transition-colors w-full"
-            >
-              <LogOut size={20} /> Leave Room
-            </button>
+            <div className="md:hidden mt-auto p-6 border-t border-gray-800 bg-gray-800/20 shrink-0">
+              <button
+                onClick={handleLeaveRoom}
+                className="flex items-center justify-center gap-2 p-3.5 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-500 font-bold rounded-xl transition-colors w-full shadow-lg"
+              >
+                <LogOut size={20} /> Leave Room
+              </button>
+            </div>
           </div>
 
           {/* Current Number Display */}
@@ -445,7 +475,7 @@ const PlayerRoom = () => {
                     }
                   `}
                   >
-                    BINGO! 🔥
+                    BINGO! 🎉
                   </button>
                 )}
               </div>

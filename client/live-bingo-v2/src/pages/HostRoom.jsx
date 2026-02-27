@@ -10,6 +10,8 @@ import {
   Users,
   X,
   Menu,
+  Hash,
+  User,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import PlayerList from "../components/PlayerList";
@@ -103,7 +105,7 @@ const HostRoom = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showPlayersSidebar, setShowPlayersSidebar] = useState(false);
 
-  // NEW: State for Mobile Header Sidebar
+  // State for Mobile Header Sidebar
   const [showMenuSidebar, setShowMenuSidebar] = useState(false);
 
   useEffect(() => {
@@ -182,6 +184,7 @@ const HostRoom = () => {
     });
 
     socket.on("false_bingo", ({ name }) => {
+      toast.dismiss();
       toast(`${name} called a false BINGO! 🤡`, { icon: "🤡" });
     });
 
@@ -217,11 +220,15 @@ const HostRoom = () => {
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(room);
+    toast.dismiss();
     toast.success("Room code copied!");
   };
 
   const handleStartGame = () => {
-    if (players.length === 0) return toast.error("Wait for players to join!");
+    if (players.length === 0) {
+      toast.dismiss();
+      return toast.error("Wait for players to join!");
+    }
     socket.emit("start_game", { roomId: room });
   };
 
@@ -266,7 +273,7 @@ const HostRoom = () => {
       {/* Mobile Overlay for Right Players Sidebar */}
       {showPlayersSidebar && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
           onClick={() => setShowPlayersSidebar(false)}
         />
       )}
@@ -276,7 +283,7 @@ const HostRoom = () => {
         {/* Part A: Header & Roll Info */}
         <div className="flex flex-col p-4 md:p-8 md:pb-4 shrink-0">
           {/* --- MOBILE TOP BAR --- */}
-          <div className="md:hidden flex justify-between items-center bg-gray-800 p-3 rounded-xl mb-6 shadow-lg">
+          <div className="md:hidden flex justify-between items-center bg-gray-800 p-3 rounded-xl mb-6 shadow-lg border border-gray-700/50">
             <button
               onClick={() => setShowMenuSidebar(true)}
               className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
@@ -303,61 +310,85 @@ const HostRoom = () => {
           {/* Mobile Overlay for Menu */}
           {showMenuSidebar && (
             <div
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden transition-opacity"
               onClick={() => setShowMenuSidebar(false)}
             />
           )}
 
           <div
             className={`
-            fixed inset-y-0 left-0 z-50 w-72 bg-gray-800 p-6 shadow-2xl flex flex-col gap-6 transform transition-transform duration-300 overflow-y-auto
-            md:static md:w-auto md:bg-gray-800 md:p-4 md:rounded-xl md:flex-row md:justify-between md:items-center md:translate-x-0 md:mb-8 md:z-auto md:shadow-lg md:overflow-visible
+            fixed inset-y-0 left-0 z-50 w-80 bg-gray-900/95 backdrop-blur-xl shadow-2xl flex flex-col transform transition-transform duration-300 overflow-hidden border-r border-gray-800
+            md:static md:w-auto md:bg-gray-800 md:p-4 md:rounded-xl md:flex-row md:justify-between md:items-center md:translate-x-0 md:mb-8 md:z-auto md:shadow-lg md:overflow-visible md:border-none md:backdrop-blur-none
             ${showMenuSidebar ? "translate-x-0" : "-translate-x-full"}
           `}
           >
-            {/* Mobile Menu Close Button */}
-            <button
-              onClick={() => setShowMenuSidebar(false)}
-              className="md:hidden absolute top-4 right-4 text-gray-400 hover:text-white"
-            >
-              <X size={24} />
-            </button>
+            {/* Mobile Menu Header */}
+            <div className="md:hidden flex items-center justify-between p-5 border-b border-gray-800 bg-gray-800/30">
+              <h2 className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500 truncate">
+                {isSpectator ? "Spectator" : "Host Panel"}
+              </h2>
+              <button
+                onClick={() => setShowMenuSidebar(false)}
+                className="p-2 bg-gray-800 text-gray-400 hover:text-white rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
 
-            <div className="flex flex-col md:flex-row md:items-center gap-6 mt-8 md:mt-0 min-w-0">
+            <div className="flex flex-col md:flex-row md:items-center gap-6 p-6 md:p-0 overflow-y-auto md:overflow-visible flex-1 min-w-0">
+              {/* Info Card */}
               <div className="min-w-0 flex flex-col gap-2">
                 <h1 className="hidden md:block text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-yellow-500 truncate">
                   {isSpectator ? "Spectator View" : "Host Panel"}
                 </h1>
 
-                <div className="flex flex-col md:flex-row md:items-center gap-2 text-sm text-gray-400 mt-0.5">
-                  <span className="font-mono rounded-md border border-gray-500 p-1.5 md:p-1 tracking-wider w-fit">
-                    Host: {hostName.toUpperCase()}
-                  </span>
-                  <span className="hidden md:inline text-gray-600">•</span>
+                <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-2 text-sm text-gray-300 bg-gray-800/40 p-4 md:p-0 rounded-xl md:bg-transparent md:rounded-none border border-gray-700/50 md:border-none mt-0.5">
+                  <div className="flex items-center gap-2">
+                    <User size={16} className="text-gray-500 md:hidden" />
+                    <span className="md:hidden text-xs uppercase tracking-wider font-bold text-gray-500 w-[70px]">
+                      Host
+                    </span>
+                    <span className="font-mono bg-gray-900 md:bg-transparent px-2 py-1 md:p-0 rounded-md md:border border-gray-500 md:p-1 tracking-wider w-fit text-white md:text-gray-400">
+                      {hostName.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="hidden md:block w-px h-4 bg-gray-600"></div>
+                  <div className="md:hidden w-full h-px bg-gray-700/50 my-1"></div>
+
                   <div
                     onClick={handleCopyCode}
-                    className="flex items-center gap-2 cursor-pointer rounded-md border border-gray-500 p-1.5 md:p-1 hover:text-yellow-400 transition-colors w-fit"
+                    className="flex items-center justify-between md:justify-start gap-2 cursor-pointer rounded-md md:border border-gray-500 md:p-1 hover:text-yellow-400 transition-colors w-full md:w-fit text-white md:text-gray-400 group"
                     title="Copy Room Code"
                   >
-                    <span className="font-mono tracking-wider">
-                      CODE: {room}
-                    </span>
-                    <Copy size={14} className="md:w-4 md:h-4" />
+                    <div className="flex items-center gap-2">
+                      <Hash size={16} className="text-gray-500 md:hidden" />
+                      <span className="md:hidden text-xs uppercase tracking-wider font-bold text-gray-500 w-[70px]">
+                        Room
+                      </span>
+                      <span className="font-mono tracking-wider bg-gray-900 md:bg-transparent px-2 py-1 md:p-0 rounded">
+                        {room}
+                      </span>
+                    </div>
+                    <Copy
+                      size={16}
+                      className="text-gray-400 md:w-4 md:h-4 group-hover:text-yellow-400"
+                    />
                   </div>
                 </div>
               </div>
 
               {/* Winning Pattern Mini-Grid */}
-              <div className="flex flex-col items-start md:items-center bg-gray-900/50 p-3 md:p-1.5 rounded-lg shrink-0 w-fit">
-                <span className="text-[10px] text-gray-400 uppercase font-bold mb-1 tracking-wider">
+              <div className="flex flex-col items-start md:items-center bg-gray-800/40 md:bg-gray-900/50 p-5 md:p-1.5 rounded-xl md:rounded-lg border border-gray-700/50 md:border-none w-full md:w-fit shrink-0">
+                <span className="text-xs md:text-[10px] text-gray-400 uppercase font-bold mb-3 md:mb-1 tracking-wider">
                   Pattern
                 </span>
                 <div
-                  className={`grid grid-cols-5 gap-[1px] w-10 h-10 border border-gray-700 bg-gray-800 p-[1px] rounded-sm ${!isSpectator && gameState === "waiting" ? "cursor-pointer hover:border-pink-500 transition-colors" : ""}`}
+                  className={`grid grid-cols-5 gap-[1px] w-20 h-20 md:w-10 md:h-10 border border-gray-600 bg-gray-700 p-[1px] rounded-sm mx-auto md:mx-0 ${!isSpectator && gameState === "waiting" ? "cursor-pointer hover:border-pink-500 transition-colors" : ""}`}
                   onClick={() => {
                     if (!isSpectator && gameState === "waiting") {
                       setShowSettings(!showSettings);
-                      setShowMenuSidebar(false); // Close sidebar on mobile when editing pattern
+                      setShowMenuSidebar(false);
                     }
                   }}
                   title={
@@ -369,7 +400,7 @@ const HostRoom = () => {
                   {Array.from({ length: 25 }).map((_, i) => (
                     <div
                       key={i}
-                      className={`w-full h-full rounded-[1px] ${winningPattern?.includes(i) ? "bg-pink-500 shadow-[0_0_2px_#ec4899]" : "bg-gray-700/50"}`}
+                      className={`w-full h-full rounded-[1px] ${winningPattern?.includes(i) ? "bg-pink-500 shadow-[0_0_2px_#ec4899]" : "bg-gray-800/80"}`}
                     />
                   ))}
                 </div>
@@ -377,7 +408,7 @@ const HostRoom = () => {
             </div>
 
             {/* Action Buttons Container */}
-            <div className="flex flex-col md:flex-row gap-3 mt-auto md:mt-0 shrink-0">
+            <div className="flex flex-col md:flex-row gap-3 mt-auto md:mt-0 shrink-0 p-6 md:p-0 border-t border-gray-800 bg-gray-800/20 md:bg-transparent md:border-none">
               {/* Desktop Edit Pattern Button */}
               {!isSpectator && gameState === "waiting" && (
                 <button
@@ -396,7 +427,7 @@ const HostRoom = () => {
                     setShowSettings(!showSettings);
                     setShowMenuSidebar(false);
                   }}
-                  className="md:hidden flex p-3 bg-gray-700 hover:bg-gray-600 rounded-lg items-center justify-center gap-2 font-bold w-full transition-colors"
+                  className="md:hidden flex p-3.5 bg-gray-700 border border-gray-600 hover:bg-gray-600 rounded-xl items-center justify-center gap-2 font-bold w-full transition-colors shadow-lg"
                 >
                   <Settings size={18} /> Edit Pattern
                 </button>
@@ -405,7 +436,7 @@ const HostRoom = () => {
               {isSpectator ? (
                 <button
                   onClick={handleLeaveAsSpectator}
-                  className="p-3 md:px-4 md:py-2 bg-red-900/50 hover:bg-red-900 rounded-lg flex items-center justify-center gap-2 font-bold text-sm w-full md:w-auto transition-colors"
+                  className="p-3.5 md:px-4 md:py-2 bg-red-600 text-white border-none hover:bg-red-700 rounded-xl md:rounded-lg flex items-center justify-center gap-2 font-bold text-sm w-full md:w-auto transition-colors shadow-lg md:shadow-none"
                 >
                   <LogOut size={16} className="md:w-5 md:h-5" />
                   <span>Leave</span>
@@ -414,14 +445,14 @@ const HostRoom = () => {
                 <>
                   <button
                     onClick={handleRestart}
-                    className="p-3 md:px-4 md:py-2 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center gap-2 font-bold text-sm w-full md:w-auto transition-colors"
+                    className="p-3.5 md:px-4 md:py-2   bg-blue-600 text-white md:border-none hover:bg-blue-700 rounded-xl md:rounded-lg flex items-center justify-center gap-2 font-bold text-sm w-full md:w-auto transition-colors shadow-lg md:shadow-none"
                     title="New Game"
                   >
                     <span>New Game</span>
                   </button>
                   <button
                     onClick={handleCloseRoom}
-                    className="p-3 md:px-4 md:py-2 bg-red-600 hover:bg-red-700 rounded-lg flex items-center justify-center gap-2 font-bold text-sm w-full md:w-auto transition-colors"
+                    className="p-3.5 md:px-4 md:py-2   bg-red-600 text-white md:border-none hover:bg-red-700 rounded-xl md:rounded-lg flex items-center justify-center gap-2 font-bold text-sm w-full md:w-auto transition-colors shadow-lg md:shadow-none"
                     title="End Room"
                   >
                     <XCircle size={16} className="md:w-5 md:h-5" />
@@ -436,7 +467,7 @@ const HostRoom = () => {
           {showSettings && !isSpectator && (
             <>
               <div
-                className="fixed inset-0 bg-black/60 z-[60]"
+                className="fixed inset-0 bg-black/60 z-[60] backdrop-blur-sm"
                 onClick={() => setShowSettings(false)}
               />
               <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[70] bg-gray-800 p-6 border border-gray-600 rounded-xl shadow-2xl w-[90%] max-w-sm">
@@ -485,7 +516,7 @@ const HostRoom = () => {
                 {gameState === "waiting" ? (
                   <button
                     onClick={handleStartGame}
-                    className="px-8 py-4 bg-green-600 hover:bg-green-500 text-xl font-bold rounded-full shadow-lg flex items-center gap-2"
+                    className="px-8 py-4 bg-green-600 hover:bg-green-500 text-xl font-bold rounded-full shadow-lg flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
                   >
                     <Play fill="currentColor" /> Start Game
                   </button>
@@ -555,27 +586,32 @@ const HostRoom = () => {
       {/* Right Column: Player List Sidebar */}
       <div
         className={`
-          fixed inset-y-0 right-0 z-50 w-80 h-full shadow-2xl transform transition-transform duration-300 ease-in-out bg-gray-800
-          md:static md:translate-x-0 md:shadow-none md:z-auto md:border-l md:border-gray-700
-          overflow-y-auto shrink-0
+          fixed inset-y-0 right-0 z-50 w-80 shadow-2xl transform transition-transform duration-300 ease-in-out bg-gray-900/95 backdrop-blur-xl border-l border-gray-800 flex flex-col
+          md:static md:translate-x-0 md:shadow-none md:z-auto md:border-gray-700 md:bg-gray-800 md:backdrop-blur-none
+          shrink-0
           ${showPlayersSidebar ? "translate-x-0" : "translate-x-full"}
         `}
       >
-        {/* Mobile Close Button */}
-        <button
-          onClick={() => setShowPlayersSidebar(false)}
-          className="md:hidden absolute top-4 right-4 z-[60] p-2 bg-gray-800 text-gray-300 hover:text-white rounded-lg shadow-md border border-gray-700"
-        >
-          <X size={18} />
-        </button>
+        {/* Mobile Player Sidebar Header */}
+        <div className="md:hidden flex justify-between items-center p-5 border-b border-gray-800 bg-gray-800/30 shrink-0">
+          <h2 className="text-xl font-bold flex items-center gap-2"></h2>
+          <button
+            onClick={() => setShowPlayersSidebar(false)}
+            className="p-2 bg-gray-800 text-gray-400 hover:text-white rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
-        <PlayerList
-          players={players}
-          onKick={isSpectator ? null : handleKick}
-          winners={winners}
-          gameStarted={gameState === "playing"}
-          winningPattern={winningPattern}
-        />
+        <div className="flex-1 overflow-y-auto">
+          <PlayerList
+            players={players}
+            onKick={isSpectator ? null : handleKick}
+            winners={winners}
+            gameStarted={gameState === "playing"}
+            winningPattern={winningPattern}
+          />
+        </div>
       </div>
     </div>
   );
