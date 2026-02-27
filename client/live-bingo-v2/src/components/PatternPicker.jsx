@@ -1,3 +1,4 @@
+// client/live-bingo-v2/src/components/PatternPicker.jsx
 import React, { useState, useEffect } from "react";
 
 const PATTERN_PRESETS = [
@@ -40,6 +41,9 @@ const PatternPicker = ({ onPatternChange, initialPattern }) => {
   }, [selectedIndices, onPatternChange]);
 
   const toggleCell = (index) => {
+    // Prevent toggling the FREE cell
+    if (index === 12) return;
+
     setSelectedIndices((prev) =>
       prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index],
     );
@@ -61,11 +65,14 @@ const PatternPicker = ({ onPatternChange, initialPattern }) => {
             <button
               key={i}
               type="button"
+              disabled={isFreeSpace} // Disable the button if it's the free space
               onClick={() => toggleCell(i)}
-              className={`w-8 h-8 rounded text-xs font-bold border transition-colors ${
-                isSelected
-                  ? "bg-green-500 border-green-600 text-white"
-                  : "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
+              className={`w-8 h-8 rounded text-[10px] font-bold border transition-colors ${
+                isFreeSpace
+                  ? "bg-pink-600 border-pink-700 text-white cursor-not-allowed opacity-80" // Distinct styling for the Free Space
+                  : isSelected
+                    ? "bg-green-500 border-green-600 text-white"
+                    : "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
               }`}
             >
               {isFreeSpace ? "FREE" : ""}
@@ -84,9 +91,8 @@ const PatternPicker = ({ onPatternChange, initialPattern }) => {
               index === 0 ? "col-span-4" : "col-span-1"
             } ${color}`}
             onClick={() => setSelectedIndices(indices)}
-            title={name} // Shows full name on hover if it gets truncated
+            title={name}
           >
-            {/* Shorten the names for the bottom row so they fit nicely */}
             {index === 0 ? name : name.charAt(0)}
           </button>
         ))}

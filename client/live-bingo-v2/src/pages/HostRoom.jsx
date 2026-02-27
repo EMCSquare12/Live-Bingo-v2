@@ -237,6 +237,12 @@ const HostRoom = () => {
       toast.dismiss();
       return toast.error("Wait for players to join!");
     }
+
+    if (!winningPattern || winningPattern.length === 0) {
+      toast.dismiss();
+      return toast.error("Select at least 1 winning cell in Pattern!");
+    }
+
     socket.emit("start_game", { roomId: room });
   };
 
