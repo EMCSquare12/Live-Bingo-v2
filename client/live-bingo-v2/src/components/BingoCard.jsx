@@ -1,5 +1,22 @@
 import React from "react";
 
+const getBingoHeaderColor = (letter) => {
+  switch (letter) {
+    case "B":
+      return "text-red-400";
+    case "I":
+      return "text-yellow-400";
+    case "N":
+      return "text-green-400";
+    case "G":
+      return "text-blue-400";
+    case "O":
+      return "text-purple-400";
+    default:
+      return "text-gray-400";
+  }
+};
+
 const BingoCard = ({ matrix, markedIndices, onCellClick, isSpectator }) => {
   // Flatten the 2D matrix for easier mapping (0-24)
   const flatMatrix = matrix.flat();
@@ -7,13 +24,13 @@ const BingoCard = ({ matrix, markedIndices, onCellClick, isSpectator }) => {
   return (
     <div className="bg-gray-800 p-4 rounded-xl shadow-2xl max-w-md w-full mx-auto">
       {/* HEADER: B I N G O */}
-      <div className="grid grid-cols-5 gap-2 mb-2 text-center">
-        {["B", "I", "N", "G", "O"].map((letter) => (
+      <div className="grid grid-cols-5 gap-2 mb-2">
+        {["B", "I", "N", "G", "O"].map((letter, index) => (
           <div
-            key={letter}
-            className="font-black text-3xl text-gray-500 drop-shadow-md"
+            key={index}
+            className="flex items-center justify-center font-black text-3xl md:text-5xl drop-shadow-md"
           >
-            {letter}
+            <span className={getBingoHeaderColor(letter)}>{letter}</span>
           </div>
         ))}
       </div>
