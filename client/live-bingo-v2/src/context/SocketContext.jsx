@@ -46,7 +46,7 @@ export const SocketProvider = ({ children }) => {
 
     const socket = io(URL);
 
-    newSocket.on("connect", () => {
+    socket.on("connect", () => {
       setIsConnected(true);
 
       // 3. Ask server to rejoin if we have data (Page Reload)
@@ -54,28 +54,28 @@ export const SocketProvider = ({ children }) => {
       const savedPlayer = sessionStorage.getItem("player");
 
       if (savedRoom && savedPlayer) {
-        newSocket.emit("rejoin_room", {
+        socket.emit("rejoin_room", {
           roomId: savedRoom,
           player: JSON.parse(savedPlayer),
         });
       }
     });
 
-    newSocket.on("disconnect", () => setIsConnected(false));
+    socket.on("disconnect", () => setIsConnected(false));
 
     // Listeners for initial room entry
-    newSocket.on("room_joined", ({ roomId, player }) => {
+    socket.on("room_joined", ({ roomId, player }) => {
       setRoom(roomId);
       setPlayer(player);
     });
 
     // 4. IMPORTANT: Listen for Host creation so the Host saves their session!
-    newSocket.on("room_created", ({ roomId, player }) => {
+    socket.on("room_created", ({ roomId, player }) => {
       setRoom(roomId);
       setPlayer(player);
     });
 
-    return () => newSocket.close();
+    return () => socket.close();
   }, []);
 
   const disconnectSocket = () => {
