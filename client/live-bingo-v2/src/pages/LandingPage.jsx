@@ -153,7 +153,7 @@ const LandingPage = () => {
               type="submit"
               className="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold"
             >
-              Start Party
+              Start Game
             </button>
             <button
               type="button"
