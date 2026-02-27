@@ -1,3 +1,4 @@
+// client/live-bingo-v2/src/pages/PlayerRoom.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { useSocket } from "../context/SocketContext";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -195,6 +196,7 @@ const PlayerRoom = () => {
       setHasBingo(false);
       setShowConfetti(false);
       setIsRolling(false);
+      setWinningPattern([]); // <--- Added this line to clear the pattern
 
       const currentHost = updatedPlayers.find((p) => p.isHost);
       if (currentHost) setHostName(currentHost.name);
@@ -354,7 +356,7 @@ const PlayerRoom = () => {
               </div>
 
               {/* Winning Pattern Mini-Grid */}
-              {winningPattern?.length > 0 && (
+              {winningPattern?.length > 0 && gameState === "playing" && (
                 <div className="flex flex-col items-start md:items-center bg-gray-800/40 md:bg-gray-900/50 p-5 md:p-1.5 rounded-xl md:rounded-lg border border-gray-700/50 md:border-none w-full md:w-fit">
                   <span className="text-xs md:text-[10px] text-gray-400 uppercase font-bold mb-3 md:mb-1 tracking-wider">
                     Winning Pattern
