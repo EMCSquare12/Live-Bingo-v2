@@ -136,7 +136,7 @@ const PlayerRoom = () => {
           setCurrentNumber(number);
           setHistory(newHistory);
           toast(`Number drawn: ${getBingoLetter(number)} ${number}`, {
-            icon: "🎲",
+            icon: "🎉",
             duration: 3000,
           });
         }
@@ -148,7 +148,7 @@ const PlayerRoom = () => {
         const newIndices = [...prev, cellIndex];
         if (checkWinCondition(newIndices)) {
           setHasBingo(true);
-          toast.success("BINGO! Claim your win now!", { icon: "🎉" });
+          toast.success("BINGO! Claim your win now!", { icon: "🔥" });
         }
         return newIndices;
       });
@@ -165,12 +165,12 @@ const PlayerRoom = () => {
 
       if (winner === player.name) {
         setShowConfetti(true);
-        toast.success(`You won ${rank}${suffix} place! 🎉`, {
+        toast.success(`You won ${rank}${suffix} place! 🔥`, {
           duration: 8000,
         });
         setTimeout(() => setShowConfetti(false), 8000);
       } else {
-        toast(`${winner} got BINGO! (${rank}${suffix})`, { icon: "🏆" });
+        toast(`${winner} got BINGO! (${rank}${suffix})`, { icon: "🎊" });
       }
     });
 
@@ -265,78 +265,118 @@ const PlayerRoom = () => {
   });
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-[auto_1fr] h-screen bg-gray-900 text-white overflow-y-auto md:overflow-hidden pb-24 md:pb  -0">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white overflow-y-auto md:overflow-hidden pb-24 md:pb-0">
       {showConfetti && <Confetti recycle={false} numberOfPieces={500} />}
-      {/* Part A: Header, Game Info & Actions (Order 1 on Mobile) */}
-      <div className="flex flex-col p-4 md:p-8 md:pb-4 order-1 md:col-start-1 md:row-start-1">
-        <div className="flex justify-between items-center mb-6 bg-gray-800 p-4 rounded-xl shadow-lg">
-          <div className="flex items-center gap-3 md:gap-6">
-            <div className="min-w-0 flex flex-col gap-2">
-              <h1 className="text-lg md:text-2xl font-bold text-pink-500 truncate max-w-30 md:max-w-xs">
-                {player.name}
-              </h1>
-              <div className="flex flex-col md:flex-row md:items-center gap-0 md:gap-2 text-[11px] md:text-sm text-gray-400">
-                <span className="font-mono rounded border border-gray-500 p-1">
-                  Room: {room}
-                </span>
-                <span className="hidden md:inline text-gray-600">•</span>
-                <span className="truncate max-w-30 md:max-w-xs p-1 rounded-md border border-gray-500">
-                  Host: {hostName.toUpperCase()}
-                </span>
-              </div>
-            </div>
 
-            {/* Winning Pattern Mini-Grid */}
-            {winningPattern?.length > 0 && (
-              <div className="flex flex-col items-center bg-gray-900/50 p-1 md:p-1.5 rounded-lg">
-                <span className="text-[8px] md:text-[10px] text-gray-400 uppercase font-bold mb-0.5 tracking-wider">
-                  Pattern
-                </span>
-                <div className="grid grid-cols-5 gap-px w-7 h-7 md:w-10 md:h-10 border border-gray-700 bg-gray-800 p-px rounded-sm">
-                  {Array.from({ length: 25 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-full h-full rounded-[1px] ${winningPattern.includes(i) ? "bg-pink-500 shadow-[0_0_2px_#ec4899]" : "bg-gray-700/50"}`}
-                    />
-                  ))}
+      {/* Left Column: Rolling Number & Call History Container */}
+      <div className="flex flex-col flex-1 order-1 md:overflow-y-auto">
+        {/* Part A: Header, Game Info & Actions */}
+        <div className="flex flex-col p-4 md:p-8 md:pb-4 shrink-0">
+          <div className="flex justify-between items-center mb-6 bg-gray-800 p-4 rounded-xl shadow-lg">
+            <div className="flex items-center gap-3 md:gap-6">
+              <div className="min-w-0 flex flex-col gap-2">
+                <h1 className="text-lg md:text-2xl font-bold text-pink-500 truncate max-w-30 md:max-w-xs">
+                  {player.name}
+                </h1>
+                <div className="flex flex-col md:flex-row md:items-center gap-0 md:gap-2 text-[11px] md:text-sm text-gray-400">
+                  <span className="font-mono rounded border border-gray-500 p-1">
+                    Room: {room}
+                  </span>
+                  <span className="hidden md:inline text-gray-600">•</span>
+                  <span className="truncate max-w-30 md:max-w-xs p-1 rounded-md border border-gray-500">
+                    Host: {hostName.toUpperCase()}
+                  </span>
                 </div>
               </div>
-            )}
+
+              {/* Winning Pattern Mini-Grid */}
+              {winningPattern?.length > 0 && (
+                <div className="flex flex-col items-center bg-gray-900/50 p-1 md:p-1.5 rounded-lg">
+                  <span className="text-[8px] md:text-[10px] text-gray-400 uppercase font-bold mb-0.5 tracking-wider">
+                    Pattern
+                  </span>
+                  <div className="grid grid-cols-5 gap-px w-7 h-7 md:w-10 md:h-10 border border-gray-700 bg-gray-800 p-px rounded-sm">
+                    {Array.from({ length: 25 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-full h-full rounded-[1px] ${winningPattern.includes(i) ? "bg-pink-500 shadow-[0_0_2px_#ec4899]" : "bg-gray-700/50"}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleLeaveRoom}
+              className="p-2 text-gray-400 hover:text-red-500 bg-gray-700 hover:bg-red-900/20 rounded-lg transition-colors"
+              title="Leave Room"
+            >
+              <LogOut size={20} />
+            </button>
           </div>
 
-          <button
-            onClick={handleLeaveRoom}
-            className="p-2 text-gray-400 hover:text-red-500 bg-gray-700 hover:bg-red-900/20 rounded-lg transition-colors"
-            title="Leave Room"
-          >
-            <LogOut size={20} />
-          </button>
+          {/* Current Number Display */}
+          <div className="mb-8 flex justify-center">
+            <div
+              className={`
+              w-32 h-32 rounded-full flex flex-col items-center justify-center gap-1 text-white
+              border-4 border-white transition-all duration-300 transform
+              ${isRolling ? "animate-bounce scale-110" : "scale-100"}
+              ${getBallColorTheme(currentNumber, isRolling)}
+            `}
+            >
+              {currentNumber && !isRolling && (
+                <span className="text-4xl font-black -mb-2 drop-shadow-md text-white/90">
+                  {getBingoLetter(currentNumber)}
+                </span>
+              )}
+              <span className="text-6xl font-black drop-shadow-md">
+                {currentNumber || "--"}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Current Number Display */}
-        <div className="mb-8 flex justify-center">
-          <div
-            className={`
-            w-32 h-32 rounded-full flex flex-col items-center justify-center gap-1 text-white
-            border-4 border-white transition-all duration-300 transform
-            ${isRolling ? "animate-bounce scale-110" : "scale-100"}
-            ${getBallColorTheme(currentNumber, isRolling)}
-          `}
-          >
-            {currentNumber && !isRolling && (
-              <span className="text-4xl font-black -mb-2 drop-shadow-md text-white/90">
-                {getBingoLetter(currentNumber)}
-              </span>
-            )}
-            <span className="text-6xl font-black drop-shadow-md">
-              {currentNumber || "--"}
-            </span>
+        {/* Part C: Call History (Scrolling with the left side) */}
+        <div className="flex flex-col p-4 md:p-8 md:pt-0 shrink-0">
+          <div className="md:mt-auto bg-gray-800 p-4 rounded-xl w-full">
+            <h3 className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-wide border-b border-gray-700 pb-2">
+              Call History
+            </h3>
+            <div className="flex flex-col gap-3">
+              {["B", "I", "N", "G", "O"].map((letter) => (
+                <div key={letter} className="flex items-start gap-4">
+                  <span
+                    className={`w-8 h-8 flex items-center justify-center font-black text-2xl drop-shadow-sm ${getBingoHeaderColor(letter)}`}
+                  >
+                    {letter}
+                  </span>
+                  <div className="flex flex-wrap gap-2 flex-1">
+                    {groupedHistory[letter].map((num) => (
+                      <span
+                        key={num}
+                        className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold border shadow-sm ${getBingoColorClasses(num)}`}
+                      >
+                        {num}
+                      </span>
+                    ))}
+                    {groupedHistory[letter].length === 0 && (
+                      <span className="text-gray-500 text-sm italic py-1">
+                        --
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-      {/* Part B: Bingo Card (Order 2 on Mobile) */}
-      <div className="bg-gray-900 p-4 py-8 md:p-8 flex items-center justify-center order-2 md:col-start-2 md:row-start-1 md:row-span-2 border-y md:border-y-0 md:border-l border-gray-700">
-        <div className="w-full max-w-xl aspect-square flex flex-col gap-4 relative">
+
+      {/* Right Column: Bingo Card Container */}
+      <div className="bg-gray-900 p-4 py-8 md:p-8 flex flex-col items-center order-2 flex-1 md:overflow-y-auto border-y md:border-y-0 md:border-l border-gray-700">
+        <div className="w-full max-w-xl aspect-square flex flex-col gap-4 relative md:my-auto">
           <BingoCard
             matrix={cardMatrix}
             markedIndices={markedIndices}
@@ -368,44 +408,10 @@ const PlayerRoom = () => {
                   }
                 `}
                 >
-                  BINGO! 🎉
+                  BINGO! 🔥
                 </button>
               )}
             </div>
-          </div>
-        </div>
-      </div>
-      {/* Part C: Call History (Order 3 on Mobile) */}
-      <div className="flex flex-col p-4 md:p-8 md:pt-0 order-3 md:col-start-1 md:row-start-2 md:overflow-y-auto">
-        <div className="md:mt-auto bg-gray-800 p-4 rounded-xl w-full">
-          <h3 className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-wide border-b border-gray-700 pb-2">
-            Call History
-          </h3>
-          <div className="flex flex-col gap-3">
-            {["B", "I", "N", "G", "O"].map((letter) => (
-              <div key={letter} className="flex items-start gap-4">
-                <span
-                  className={`w-8 h-8 flex items-center justify-center font-black text-2xl drop-shadow-sm ${getBingoHeaderColor(letter)}`}
-                >
-                  {letter}
-                </span>
-                <div className="flex flex-wrap gap-2 flex-1">
-                  {groupedHistory[letter].map((num) => (
-                    <span
-                      key={num}
-                      className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold border shadow-sm ${getBingoColorClasses(num)}`}
-                    >
-                      {num}
-                    </span>
-                  ))}
-                  {groupedHistory[letter].length === 0 && (
-                    <span className="text-gray-500 text-sm italic py-1">
-                      --
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
