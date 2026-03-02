@@ -146,9 +146,14 @@ const HostRoom = () => {
     socket.on("game_started", ({ winners: initialWinners }) => {
       setGameState("playing");
       if (initialWinners) setWinners(initialWinners);
+      if (serverPattern) setWinningPattern(serverPattern);
       toast.success("Game Started! Players' cards are locked.");
     });
 
+    socket.on("sync_history", ({ number, history: restoredHistory }) => {
+      setCurrentNumber(number);
+      setHistory(restoredHistory);
+    });
     socket.on("number_rolled", ({ number, history: newHistory }) => {
       setIsRolling(true);
       let i = 0;
@@ -212,6 +217,7 @@ const HostRoom = () => {
       socket.off("game_reset");
       socket.off("room_joined");
       socket.off("room_destroyed");
+      socket.off("sync_history");
     };
   }, [socket, navigate, isSpectator, room, player?.name, setPlayer]);
 
@@ -537,17 +543,21 @@ const HostRoom = () => {
                 ) : (
                   <button
                     onClick={handleRoll}
-                    disabled={isRolling}
+                    disabled={isRolling || history.length >= 75}
                     className={`
-                      px-12 py-4 text-2xl font-bold rounded-full shadow-lg transition-all
-                      ${
-                        isRolling
-                          ? "bg-gray-600 cursor-not-allowed opacity-50"
-                          : "bg-pink-600 hover:bg-pink-500 hover:scale-105 active:scale-95"
-                      }
-                    `}
+    px-12 py-4 text-2xl font-bold rounded-full shadow-lg transition-all
+    ${
+      isRolling || history.length >= 75
+        ? "bg-gray-600 cursor-not-allowed opacity-50"
+        : "bg-pink-600 hover:bg-pink-500 hover:scale-105 active:scale-95"
+    }
+  `}
                   >
-                    {isRolling ? "Rolling..." : "ROLL NUMBER"}
+                    {isRolling
+                      ? "Rolling..."
+                      : history.length >= 75
+                        ? "ALL CALLED"
+                        : "ROLL NUMBER"}
                   </button>
                 )}
               </div>

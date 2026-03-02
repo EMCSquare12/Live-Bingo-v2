@@ -335,7 +335,7 @@ module.exports = (io, socket) => {
           });
 
           if (room.currentNumber) {
-            socket.emit("number_rolled", {
+            socket.emit("sync_history", {
               number: room.currentNumber,
               history: room.numbersDrawn,
             });

@@ -102,6 +102,15 @@ const PlayerRoom = () => {
   );
 
   useEffect(() => {
+    if (player?.markedIndices) {
+      setMarkedIndices(player.markedIndices);
+    }
+    if (player?.cardMatrix && player.cardMatrix.length > 0) {
+      setCardMatrix(player.cardMatrix);
+    }
+  }, [player]);
+
+  useEffect(() => {
     if (gameState === "playing" && winningPattern?.length > 0) {
       if (checkWinCondition(markedIndices)) setHasBingo(true);
     }
@@ -111,6 +120,18 @@ const PlayerRoom = () => {
     if (!socket) return;
 
     let rollInterval;
+
+    socket.on("sync_history", ({ number, history: restoredHistory }) => {
+      setCurrentNumber(number);
+      setHistory(restoredHistory);
+    });
+
+    socket.on(
+      "update_player_progress",
+      ({ markedIndices: restoredIndices }) => {
+        setMarkedIndices(restoredIndices);
+      },
+    );
 
     socket.on(
       "game_started",
@@ -196,7 +217,7 @@ const PlayerRoom = () => {
       setHasBingo(false);
       setShowConfetti(false);
       setIsRolling(false);
-      setWinningPattern([]); // <--- Added this line to clear the pattern
+      setWinningPattern([]);
 
       const currentHost = updatedPlayers.find((p) => p.isHost);
       if (currentHost) setHostName(currentHost.name);
@@ -231,6 +252,8 @@ const PlayerRoom = () => {
       socket.off("game_reset");
       socket.off("card_shuffled");
       socket.off("room_destroyed");
+      socket.off("update_player_progress");
+      socket.off("sync_history");
     };
   }, [socket, navigate, player.name, setPlayer, checkWinCondition]);
 
